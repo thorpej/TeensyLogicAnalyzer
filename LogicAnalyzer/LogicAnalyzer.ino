@@ -971,25 +971,25 @@ void exportCSV(Stream &stream)
   while (true) {
     char output[50]; // Holds output string
     if ((cpu == cpu_65c02) || (cpu == cpu_6502)) {
-      sync = control[i] & 0x10;
+      sync = control[i] & CC_6502_SYNC;
     }
     if ((cpu == cpu_65c02) || (cpu == cpu_6502) || (cpu == cpu_6800) || (cpu == cpu_6809) || (cpu == cpu_6809e)) {
-      rw = control[i] & 0x08;
-      reset = control[i] & 0x04;
-      irq = control[i] & 0x02;
-      nmi = control[i] & 0x01;
+      rw = control[i] & CC_6502_RW;
+      reset = control[i] & CC_6502_RESET;
+      irq = control[i] & CC_6502_IRQ;
+      nmi = control[i] & CC_6502_NMI;
     }
     if (cpu == cpu_6800) {
-      vma = control[i] & 0x10;
+      vma = control[i] & CC_6800_VMA;
     }
     if (cpu == cpu_z80) {
-      wr = control[i] & 0x01;
-      rd = control[i] & 0x02;
-      iorq = control[i] & 0x04;
-      mreq = control[i] & 0x08;
-      m1 = control[i] & 0x10;
-      reset = control[i] & 0x20;
-      intr = control[i] & 0x40;
+      wr = control[i] & CC_Z80_WR;
+      rd = control[i] & CC_Z80_RD;
+      iorq = control[i] & CC_Z80_IORQ;
+      mreq = control[i] & CC_Z80_MREQ;
+      m1 = control[i] & CC_Z80_M1;
+      reset = control[i] & CC_Z80_RESET;
+      intr = control[i] & CC_Z80_INT;
     }
 
     if ((cpu == cpu_65c02) || (cpu == cpu_6502)) {
