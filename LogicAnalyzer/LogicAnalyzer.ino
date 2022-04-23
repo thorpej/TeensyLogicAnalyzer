@@ -719,13 +719,18 @@ void list(Stream &stream, int start, int end)
   int first = (triggerPoint - pretrigger + samples) % samples;
   int last = (triggerPoint - pretrigger + samples - 1) % samples;
 
+  bool seen_lic = false;
+
+  const char *cycle, *opcode;
+  const char *comment;
+
   // Display data
   int i = first;
   int j = 0;
   while (true) {
-    const char *cycle = "";
-    const char *opcode = "";
-    const char *comment = "";
+    cycle = "";
+    opcode = "";
+    comment = "";
 
     if ((j >= start) && (j <= end)) {
 
@@ -780,11 +785,27 @@ void list(Stream &stream, int start, int end)
           cycle = "-";
           opcode = "";
         } else if (control[i] & CC_6809_RW) {
+          // On 6809E, if we saw LIC on the previous cycle, then
+          // this is an insn fetch.  We're just going to assume
+          // that the first sample is an insn fetch, because we
+          // don't have any other indication.
           cycle = "R";
-          opcode = opcodes_6809[data[i]];
+          if (cpu == cpu_6809e) {
+            if (seen_lic || j == 0) {
+              opcode = opcodes_6809[data[i]];
+              seen_lic = false;
+            } else {
+              opcode = "";
+            }
+          } else {
+            opcode = opcodes_6809[data[i]];
+          }
         } else {
           cycle = "W";
           opcode = "";
+        }
+        if (cpu == cpu_6809e && (control[i] & CC_6809E_LIC)) {
+          seen_lic = true;
         }
       }
 
