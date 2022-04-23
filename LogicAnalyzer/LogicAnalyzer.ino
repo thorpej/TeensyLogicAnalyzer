@@ -428,18 +428,6 @@ const char *opcodes_6809[256] = {
 #define WAIT_CLK_LOW while (digitalReadFast(CC_Z80_CLK_PIN) == HIGH) ;
 #define WAIT_CLK_HIGH while (digitalReadFast(CC_Z80_CLK_PIN) == LOW) ;
 
-#define cpu_6800like_rw   (cpu == cpu_6502 || cpu == cpu_65c02 || \
-                           cpu == cpu_6800 || cpu == cpu_6809)
-
-#define cpu_6800like_reset (cpu == cpu_6502 || cpu == cpu_65c02 || \
-                            cpu == cpu_6800 || cpu == cpu_6809)
-
-#define cpu_6800like_irq  (cpu == cpu_6502 || cpu == cpu_65c02 || \
-                           cpu == cpu_6800 || cpu == cpu_6809)
-
-#define cpu_6800like_nmi  (cpu == cpu_6502 || cpu == cpu_65c02 || \
-                           cpu == cpu_6800 || cpu == cpu_6809)
-
 uint32_t
 scramble_CAxx(uint32_t ca)
 {
