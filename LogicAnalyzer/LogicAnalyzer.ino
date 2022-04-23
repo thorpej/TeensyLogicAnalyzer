@@ -11,7 +11,7 @@
   Copyright (c) 2022 by Jason R. Thorpe <thorpej@me.com>
 
   To Do:
-  - Add support for BS, BA, /HALT, and /FIRQ lines on 6809 & 6809E.
+  - Add support for BS, BA, and /FIRQ lines on 6809 & 6809E.
   - Add support for LIC on 6809E.
   - Add support for Z80 control line triggers.
   - Add support for Z80 I/O read or write trigger.
@@ -944,6 +944,7 @@ void exportCSV(Stream &stream)
   bool vma = false;
   bool ba = false;
   bool bs = false;
+  bool lic = false;
   bool wr = false;
   bool rd = false;
   bool iorq = false;
@@ -955,8 +956,11 @@ void exportCSV(Stream &stream)
   if ((cpu == cpu_65c02) || (cpu == cpu_6502)) {
     stream.println("Index,SYNC,R/W,/RESET,/IRQ,/NMI,Address,Data");
   }
-  if (cpu == cpu_6809 || cpu == cpu_6809e) {
+  if (cpu == cpu_6809) {
     stream.println("Index,BA,BS,R/W,/RESET,/IRQ,/FIRQ,/NMI,Address,Data");
+  }
+  if (cpu == cpu_6809e) {
+    stream.println("Index,BA,BS,LIC,R/W,/RESET,/IRQ,/FIRQ,/NMI,Address,Data");
   }
   if (cpu == cpu_6800) {
     stream.println("Index,VMA,R/W,/RESET,/IRQ,/NMI,Address,Data");
@@ -989,6 +993,9 @@ void exportCSV(Stream &stream)
       ba = control[i] & CC_6809_BA;
       bs = control[i] & CC_6809_BS;
       firq = control[i] & CC_6809_FIRQ;
+    }
+    if (cpu == cpu_6809e) {
+      lic = control[i] & CC_6809E_LIC;
     }
     if (cpu == cpu_z80) {
       wr = control[i] & CC_Z80_WR;
@@ -1024,7 +1031,7 @@ void exportCSV(Stream &stream)
               data[i]
              );
     }
-    if (cpu == cpu_6809 || cpu == cpu_6809e) {
+    if (cpu == cpu_6809) {
       sprintf(output, "%d,%c,%c,%c,%c,%c,%c,%c,%04lX,%02lX",
               j,
               ba ? '1' : '0',
@@ -1037,6 +1044,22 @@ void exportCSV(Stream &stream)
               address[i],
               data[i]
              );
+    }
+    if (cpu == cpu_6809e) {
+      sprintf(output, "%d,%c,%c,%c,%c,%c,%c,%c,%c,%04lX,%02lX",
+              j,
+              ba ? '1' : '0',
+              bs ? '1' : '0',
+              lic ? '1' : '0',
+              rw ? '1' : '0',
+              reset ? '1' : '0',
+              irq ? '1' : '0',
+              firq ? '1' : '0',
+              nmi ? '1' : '0',
+              address[i],
+              data[i]
+             );
+
     }
     if (cpu == cpu_z80) {
       sprintf(output, "%d,%c,%c,%c,%c,%c,%c,%c,%04lX,%02lX",
