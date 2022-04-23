@@ -942,6 +942,8 @@ void exportCSV(Stream &stream)
   bool firq = false;
   bool nmi = false;
   bool vma = false;
+  bool ba = false;
+  bool bs = false;
   bool wr = false;
   bool rd = false;
   bool iorq = false;
@@ -954,7 +956,7 @@ void exportCSV(Stream &stream)
     stream.println("Index,SYNC,R/W,/RESET,/IRQ,/NMI,Address,Data");
   }
   if (cpu == cpu_6809 || cpu == cpu_6809e) {
-    stream.println("Index,R/W,/RESET,/IRQ,/FIRQ,/NMI,Address,Data");
+    stream.println("Index,BA,BS,R/W,/RESET,/IRQ,/FIRQ,/NMI,Address,Data");
   }
   if (cpu == cpu_6800) {
     stream.println("Index,VMA,R/W,/RESET,/IRQ,/NMI,Address,Data");
@@ -984,6 +986,8 @@ void exportCSV(Stream &stream)
       vma = control[i] & CC_6800_VMA;
     }
     if ((cpu == cpu_6809) || (cpu == cpu_6809e)) {
+      ba = control[i] & CC_6809_BA;
+      bs = control[i] & CC_6809_BS;
       firq = control[i] & CC_6809_FIRQ;
     }
     if (cpu == cpu_z80) {
@@ -1021,8 +1025,10 @@ void exportCSV(Stream &stream)
              );
     }
     if (cpu == cpu_6809 || cpu == cpu_6809e) {
-      sprintf(output, "%d,%c,%c,%c,%c,%c,%04lX,%02lX",
+      sprintf(output, "%d,%c,%c,%c,%c,%c,%c,%c,%04lX,%02lX",
               j,
+              ba ? '1' : '0',
+              bs ? '1' : '0',
               rw ? '1' : '0',
               reset ? '1' : '0',
               irq ? '1' : '0',
