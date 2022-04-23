@@ -697,9 +697,7 @@ void help()
   if (cpu == cpu_6809) {
     Serial.println("t firq 0|1           - Trigger on /FIRQ level");
   }
-  if (cpu != cpu_z80) {
-    Serial.println("t nmi 0|1            - Trigger on /NMI level");
-  }
+  Serial.println("t nmi 0|1            - Trigger on /NMI level");
   Serial.println("t none               - Trigger freerun");
   Serial.println("g                    - Go/start analyzer");
   Serial.println("l [start] [end]      - List samples");
@@ -1166,7 +1164,7 @@ void go()
       // 6502, 6800, 6809 -- all 6800-like
       which_c_trigger = CC_6800_NMI;
     } else {
-      // which_c_trigger = CC_Z80_NMI;
+      which_c_trigger = CC_Z80_NMI;
     }
   }
   // If a control signal trigger was specified, encode it.
