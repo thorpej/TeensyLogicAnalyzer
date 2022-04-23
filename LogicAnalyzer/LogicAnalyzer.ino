@@ -772,7 +772,14 @@ void list(Stream &stream, int start, int end)
       }
 
       if (cpu == cpu_6809 || cpu == cpu_6809e) {
-        if (control[i] & CC_6809_RW) {
+        // 6809 doens't have a VMA signal like the 6800, but the
+        // data sheet describes how to detect a so-called "dummy
+        // cycle" (which is also calls "/VMA").
+        if (address[i] == 0xffff &&
+            (control[i] & (CC_6809_RW | CC_6809_BS)) == CC_6809_RW) {
+          cycle = "-";
+          opcode = "";
+        } else if (control[i] & CC_6809_RW) {
           cycle = "R";
           opcode = opcodes_6809[data[i]];
         } else {
