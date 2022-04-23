@@ -404,9 +404,11 @@ const char *opcodes_6809[256] = {
 #define CC_6809_BA        CC8_BITMASK
 #define CC_6809_BS        CC9_BITMASK
 #define CC_6809E_TSC      CC10_BITMASK
+#define CC_6809_MRDY      CC11_BITMASK        // NOT 6809E
 #define CC_6809E_AVMA     CC11_BITMASK
+#define CC_6809_DMA_BREQ  CC12_BITMASK        // NOT 6809E
 #define CC_6809E_BUSY     CC12_BITMASK
-#define CC_6809E_HALT     CC13_BITMASK
+#define CC_6809_HALT      CC13_BITMASK
 
 #define CC_6809_E_PIN     CC0_PIN
 #define CC_6809_Q_PIN     CC1_PIN
