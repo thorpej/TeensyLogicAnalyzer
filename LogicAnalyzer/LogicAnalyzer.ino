@@ -11,10 +11,9 @@
   Copyright (c) 2022 by Jason R. Thorpe <thorpej@me.com>
 
   To Do:
-  - Add support for BS, BA, cand /FIRQ lines on 6809 & 6809E.
-  - Add support for LIC on 6809E.
   - Add support for Z80 control line triggers.
   - Add support for Z80 I/O read or write trigger.
+  - Better 6809 disassembly.
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
