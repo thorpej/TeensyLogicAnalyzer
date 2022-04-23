@@ -286,11 +286,11 @@ const char *opcodes_6809[256] = {
 // 34 (2.29) - CC7
 // 35 (2.28) - CC8
 // 36 (2.18) - CC9
-// 37 (2.19)
+// 37 (2.19) - CC10
 // 38 (1.28) - CC6
-// 39 (1.29)
-// 40 (1.20)
-// 41 (1.21)
+// 39 (1.29) - CC11
+// 40 (1.20) - CC12
+// 41 (1.21) - CC13
 
 #define DBUS_DIR_PIN      30
 #define BUTTON_PIN        31
@@ -338,6 +338,10 @@ const char *opcodes_6809[256] = {
 #define CC7_PIN_BITMASK   CORE_PIN34_BITMASK  // in CDxx_PSR
 #define CC8_PIN_BITMASK   CORE_PIN35_BITMASK  // in CDxx_PSR
 #define CC9_PIN_BITMASK   CORE_PIN36_BITMASK  // in CDxx_PSR
+#define CC10_PIN_BITMASK  CORE_PIN37_BITMASK  // in CDxx_PSR
+#define CC11_PIN_BITMASK  CORE_PIN39_BITMASK  // in CAxx_PSR
+#define CC12_PIN_BITMASK  CORE_PIN40_BITMASK  // in CAxx_PSR
+#define CC13_PIN_BITMASK  CORE_PIN41_BITMASK  // in CAxx_PSR
 
 // We need to poll certain CC pins, so define constants for
 // them here.
@@ -351,17 +355,25 @@ const char *opcodes_6809[256] = {
 #define CC7_PIN           34
 #define CC8_PIN           35
 #define CC9_PIN           36
+#define CC10_PIN          37
+#define CC11_PIN          39
+#define CC12_PIN          40
+#define CC13_PIN          41
 
-#define CC0_BITMASK       (1U << 0)
-#define CC1_BITMASK       (1U << 1)
-#define CC2_BITMASK       (1U << 2)
-#define CC3_BITMASK       (1U << 3)
-#define CC4_BITMASK       (1U << 4)
-#define CC5_BITMASK       (1U << 5)
-#define CC6_BITMASK       (1U << 6)
-#define CC7_BITMASK       (1U << 7)
-#define CC8_BITMASK       (1U << 8)
-#define CC9_BITMASK       (1U << 9)
+#define CC0_BITMASK       (1U <<  0)
+#define CC1_BITMASK       (1U <<  1)
+#define CC2_BITMASK       (1U <<  2)
+#define CC3_BITMASK       (1U <<  3)
+#define CC4_BITMASK       (1U <<  4)
+#define CC5_BITMASK       (1U <<  5)
+#define CC6_BITMASK       (1U <<  6)
+#define CC7_BITMASK       (1U <<  7)
+#define CC8_BITMASK       (1U <<  8)
+#define CC9_BITMASK       (1U <<  9)
+#define CC10_BITMASK      (1U << 10)
+#define CC11_BITMASK      (1U << 11)
+#define CC12_BITMASK      (1U << 12)
+#define CC13_BITMASK      (1U << 13)
 
 #define CC_6502_PHI2      CC0_BITMASK
 #define CC_6502_SYNC      CC1_BITMASK
@@ -391,6 +403,10 @@ const char *opcodes_6809[256] = {
 #define CC_6809E_LIC      CC7_BITMASK
 #define CC_6809_BA        CC8_BITMASK
 #define CC_6809_BS        CC9_BITMASK
+#define CC_6809E_TSC      CC10_BITMASK
+#define CC_6809E_AVMA     CC11_BITMASK
+#define CC_6809E_BUSY     CC12_BITMASK
+#define CC_6809E_HALT     CC13_BITMASK
 
 #define CC_6809_E_PIN     CC0_PIN
 #define CC_6809_Q_PIN     CC1_PIN
@@ -491,6 +507,16 @@ scramble_CCxx(uint32_t cc, uint32_t *aregp, uint32_t *dregp)
   if (cc & CC6_BITMASK) {
     *aregp |= CC6_PIN_BITMASK;
   }
+  if (cc & CC11_BITMASK) {
+    *aregp |= CC11_PIN_BITMASK;
+  }
+  if (cc & CC12_BITMASK) {
+    *aregp |= CC12_PIN_BITMASK;
+  }
+  if (cc & CC13_BITMASK) {
+    *aregp |= CC13_PIN_BITMASK;
+  }
+
   if (cc & CC7_BITMASK) {
     *dregp |= CC7_PIN_BITMASK;
   }
@@ -500,6 +526,10 @@ scramble_CCxx(uint32_t cc, uint32_t *aregp, uint32_t *dregp)
   if (cc & CC9_BITMASK) {
     *dregp |= CC9_PIN_BITMASK;
   }
+  if (cc & CC10_BITMASK) {
+    *dregp |= CC10_PIN_BITMASK;
+  }
+
   return ((cc & CC0_BITMASK) ? CC0_PIN_BITMASK : 0) |
          ((cc & CC1_BITMASK) ? CC1_PIN_BITMASK : 0) |
          ((cc & CC2_BITMASK) ? CC2_PIN_BITMASK : 0) |
@@ -511,18 +541,23 @@ scramble_CCxx(uint32_t cc, uint32_t *aregp, uint32_t *dregp)
 uint32_t
 unscramble_CCxx(uint32_t creg, uint32_t areg, uint32_t dreg)
 {
-  return ((creg & CC0_PIN_BITMASK) ? CC0_BITMASK : 0) |
-         ((creg & CC1_PIN_BITMASK) ? CC1_BITMASK : 0) |
-         ((creg & CC2_PIN_BITMASK) ? CC2_BITMASK : 0) |
-         ((creg & CC3_PIN_BITMASK) ? CC3_BITMASK : 0) |
-         ((creg & CC4_PIN_BITMASK) ? CC4_BITMASK : 0) |
-         ((creg & CC5_PIN_BITMASK) ? CC5_BITMASK : 0) |
+  return ((creg &  CC0_PIN_BITMASK) ?  CC0_BITMASK : 0) |
+         ((creg &  CC1_PIN_BITMASK) ?  CC1_BITMASK : 0) |
+         ((creg &  CC2_PIN_BITMASK) ?  CC2_BITMASK : 0) |
+         ((creg &  CC3_PIN_BITMASK) ?  CC3_BITMASK : 0) |
+         ((creg &  CC4_PIN_BITMASK) ?  CC4_BITMASK : 0) |
+         ((creg &  CC5_PIN_BITMASK) ?  CC5_BITMASK : 0) |
          // CC6 is in the areg
-         ((areg & CC6_PIN_BITMASK) ? CC6_BITMASK : 0) |
-         // CC7-9 are in the dreg
-         ((dreg & CC7_PIN_BITMASK) ? CC7_BITMASK : 0) |
-         ((dreg & CC8_PIN_BITMASK) ? CC8_BITMASK : 0) |
-         ((dreg & CC9_PIN_BITMASK) ? CC9_BITMASK : 0);
+         ((areg &  CC6_PIN_BITMASK) ?  CC6_BITMASK : 0) |
+         // CC7-10 are in the dreg
+         ((dreg &  CC7_PIN_BITMASK) ?  CC7_BITMASK : 0) |
+         ((dreg &  CC8_PIN_BITMASK) ?  CC8_BITMASK : 0) |
+         ((dreg &  CC9_PIN_BITMASK) ?  CC9_BITMASK : 0) |
+         ((dreg & CC10_PIN_BITMASK) ? CC10_BITMASK : 0) |
+         // CC11-13 are in the areg
+         ((areg & CC11_PIN_BITMASK) ? CC11_BITMASK : 0) |
+         ((areg & CC12_PIN_BITMASK) ? CC12_BITMASK : 0) |
+         ((areg & CC13_PIN_BITMASK) ? CC13_BITMASK : 0);
 }
 
 // Rearrange sampled bits of data in buffer back into address, data,
