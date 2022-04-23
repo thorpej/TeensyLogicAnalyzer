@@ -372,8 +372,6 @@ const char *opcodes_6809[256] = {
 #define CC_6502_NMI       CC5_BITMASK
 
 #define CC_6502_PHI2_PIN  CC0_PIN
-#define CC_6502_RW_PIN    CC2_PIN
-#define CC_6502_RESET_PIN CC3_PIN
 
 #define CC_6800_PHI2      CC0_BITMASK         // same as 6502
 #define CC_6800_VMA       CC1_BITMASK
@@ -383,8 +381,6 @@ const char *opcodes_6809[256] = {
 #define CC_6800_NMI       CC5_BITMASK         // same as 6502
 
 #define CC_6800_PHI2_PIN  CC0_PIN
-#define CC_6800_RW_PIN    CC2_PIN
-#define CC_6800_RESET_PIN CC3_PIN
 
 #define CC_6809_E         CC0_BITMASK
 #define CC_6809_Q         CC1_BITMASK
@@ -399,8 +395,6 @@ const char *opcodes_6809[256] = {
 
 #define CC_6809_E_PIN     CC0_PIN
 #define CC_6809_Q_PIN     CC1_PIN
-#define CC_6809_RW_PIN    CC2_PIN
-#define CC_6809_RESET_PIN CC3_PIN
 
 #define CC_Z80_CLK        CC0_BITMASK
 #define CC_Z80_M1         CC1_BITMASK
@@ -413,12 +407,6 @@ const char *opcodes_6809[256] = {
 #define CC_Z80_NMI        CC8_BITMASK
 
 #define CC_Z80_CLK_PIN    CC0_PIN
-#define CC_Z80_M1_PIN     CC1_PIN
-#define CC_Z80_MREQ_PIN   CC2_PIN
-#define CC_Z80_IORQ_PIN   CC3_PIN
-#define CC_Z80_RD_PIN     CC4_PIN
-#define CC_Z80_WR_PIN     CC5_PIN
-#define CC_Z80_INT_PIN    CC7_PIN
 
 // Macros
 #define WAIT_PHI2_LOW while (digitalReadFast(CC_6502_PHI2_PIN) == HIGH) ;
