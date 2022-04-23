@@ -11,7 +11,7 @@
   Copyright (c) 2022 by Jason R. Thorpe <thorpej@me.com>
 
   To Do:
-  - Add support for BS, BA, and /FIRQ lines on 6809 & 6809E.
+  - Add support for BS, BA, cand /FIRQ lines on 6809 & 6809E.
   - Add support for LIC on 6809E.
   - Add support for Z80 control line triggers.
   - Add support for Z80 I/O read or write trigger.
@@ -732,7 +732,7 @@ void list(Stream &stream, int start, int end)
       // 6502 SYNC high indicates opcode/instruction fetch, otherwise
       // show as read or write.
       if ((cpu == cpu_65c02) || (cpu == cpu_6502)) {
-        if  (control[i] & 0x10) {
+        if  (control[i] & CC_6502_SYNC) {
           cycle = "F";
           if (cpu == cpu_65c02) {
             opcode = opcodes_65c02[data[i]];
@@ -762,7 +762,7 @@ void list(Stream &stream, int start, int end)
           }
           opcode = s.c_str();
 
-        } else if (control[i] & 0x08) {
+        } else if (control[i] & CC_6502_RW) {
           cycle = "R";
           opcode = "";
         } else {
@@ -772,7 +772,7 @@ void list(Stream &stream, int start, int end)
       }
 
       if (cpu == cpu_6809 || cpu == cpu_6809e) {
-        if (control[i] & 0x08) {
+        if (control[i] & CC_6809_RW) {
           cycle = "R";
           opcode = opcodes_6809[data[i]];
         } else {
@@ -789,19 +789,19 @@ void list(Stream &stream, int start, int end)
         //  1    1      0    0   1   I/O read
         //  1    1      0    1   0   I/O write
 
-        if (!(control[i] & 0x10)) {
+        if (!(control[i] & CC_Z80_M1)) {
           cycle = "F";
           opcode = opcodes_z80[data[i]];
-        } else if (!(control[i] & 0x08) && !(control[i] & 0x02)) {
+        } else if (!(control[i] & CC_Z80_MREQ) && !(control[i] & CC_Z80_RD)) {
           cycle = "R";
           opcode = "";
-        } else if (!(control[i] & 0x08) && !(control[i] & 0x01)) {
+        } else if (!(control[i] & CC_Z80_MREQ) && !(control[i] & CC_Z80_WR)) {
           cycle = "W";
           opcode = "";
-        } else if (!(control[i] & 0x04) && !(control[i] & 0x02)) {
+        } else if (!(control[i] & CC_Z80_IORQ) && !(control[i] & CC_Z80_RD)) {
           cycle = "IR";
           opcode = "";
-        } else if (!(control[i] & 0x04) && !(control[i] & 0x01)) {
+        } else if (!(control[i] & CC_Z80_IORQ) && !(control[i] & CC_Z80_WR)) {
           cycle = "IW";
           opcode = "";
         } else {
@@ -815,11 +815,11 @@ void list(Stream &stream, int start, int end)
         //  0   X  Internal cycle
         //  1   0  Memory read
         //  1   1  Memory write
-        if (!(control[i] & 0x10)) {
+        if (!(control[i] & CC_6800_VMA)) {
           cycle = "-";
           opcode = "";
         } else {
-          if (control[i] & 0x08) {
+          if (control[i] & CC_6800_RW) {
             cycle = "R";
             opcode = opcodes_6800[data[i]];
           } else {
@@ -832,11 +832,11 @@ void list(Stream &stream, int start, int end)
       // Check for 6502 /RESET, /IRQ, or /NMI active, vector address, or
       // stack access
       if ((cpu == cpu_65c02) || (cpu == cpu_6502)) {
-        if (!(control[i] & 0x04)) {
+        if (!(control[i] & CC_6502_RESET)) {
           comment = "RESET ACTIVE";
-        } else if (!(control[i] & 0x02)) {
+        } else if (!(control[i] & CC_6502_IRQ)) {
           comment = "IRQ ACTIVE";
-        } else if (!(control[i] & 0x01)) {
+        } else if (!(control[i] & CC_6502_NMI)) {
           comment = "NMI ACTIVE";
         } else if ((address[i] == 0xfffa) || (address[i] == 0xfffb)) {
           comment = "NMI VECTOR";
@@ -853,11 +853,11 @@ void list(Stream &stream, int start, int end)
 
       // Check for 6800 /RESET, /IRQ, or /NMI active, vector address.
       if (cpu == cpu_6800) {
-        if (!(control[i] & 0x04)) {
+        if (!(control[i] & CC_6800_RESET)) {
           comment = "RESET ACTIVE";
-        } else if (!(control[i] & 0x02)) {
+        } else if (!(control[i] & CC_6800_IRQ)) {
           comment = "IRQ ACTIVE";
-        } else if (!(control[i] & 0x01)) {
+        } else if (!(control[i] & CC_6800_NMI)) {
           comment = "NMI ACTIVE";
         } else if ((address[i] == 0xfff8) || (address[i] == 0xfff8)) {
           comment = "IRQ VECTOR";
@@ -874,11 +874,13 @@ void list(Stream &stream, int start, int end)
 
       // Check for 6809 /RESET, /IRQ, or /NMI active, vector address.
       if (cpu == cpu_6809 || cpu == cpu_6809e) {
-        if (!(control[i] & 0x04)) {
+        if (!(control[i] & CC_6809_RESET)) {
           comment = "RESET ACTIVE";
-        } else if (!(control[i] & 0x02)) {
+        } else if (!(control[i] & CC_6809_IRQ)) {
           comment = "IRQ ACTIVE";
-        } else if (!(control[i] & 0x01)) {
+        } else if (!(control[i] & CC_6809_FIRQ)) {
+          comment = "FIRQ ACTIVE";
+        } else if (!(control[i] & CC_6809_NMI)) {
           comment = "NMI ACTIVE";
         } else if ((address[i] == 0xfff2) || (address[i] == 0xfff3)) {
           comment = "SWI3 VECTOR";
@@ -901,9 +903,9 @@ void list(Stream &stream, int start, int end)
 
       // Check for Z80 /RESET or /INT active
       if (cpu == cpu_z80) {
-        if (!(control[i] & 0x20)) {
+        if (!(control[i] & CC_Z80_RESET)) {
           comment = "RESET ACTIVE";
-        } else if (!(control[i] & 0x40)) {
+        } else if (!(control[i] & CC_Z80_INT)) {
           comment = "INT ACTIVE";
         } else {
           comment = "";
