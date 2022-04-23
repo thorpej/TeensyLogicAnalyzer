@@ -42,7 +42,7 @@ const char *origVersionString = "Based on Logic Analyzer version 0.30 by Jeff Tr
 // Type definitions
 typedef enum { tr_address, tr_io, tr_data, tr_reset, tr_irq, tr_firq, tr_nmi, tr_none } trigger_t;
 typedef enum { tr_read, tr_write, tr_either } cycle_t;
-typedef enum { cpu_6502, cpu_65c02, cpu_6800, cpu_6809, cpu_z80 } cpu_t;
+typedef enum { cpu_6502, cpu_65c02, cpu_6800, cpu_6809, cpu_6809e, cpu_z80 } cpu_t;
 
 // Global variables
 uint32_t control[BUFFSIZE];           // Recorded control line data
@@ -581,6 +581,7 @@ void triggerButton()
 void help()
 {
   Serial.println(versionString);
+  Serial.println(origVersionString);
 
   Serial.print("CPU: ");
   switch (cpu) {
@@ -595,6 +596,9 @@ void help()
       break;
     case cpu_6809:
       Serial.println("6809");
+      break;
+    case cpu_6809e:
+      Serial.println("6809E");
       break;
     case cpu_z80:
       Serial.println("Z80");
@@ -661,7 +665,7 @@ void help()
       Serial.println(triggerLevel ? "high" : "low");
       break;
     case tr_firq:
-      if (cpu == cpu_6809) {
+      if (cpu == cpu_6809 || cpu == cpu_6809e) {
         Serial.print("on /FIRQ ");
         Serial.println(triggerLevel ? "high" : "low");
       }
@@ -694,7 +698,7 @@ void help()
   } else {
     Serial.println("t irq 0|1            - Trigger on /IRQ level");
   }
-  if (cpu == cpu_6809) {
+  if (cpu == cpu_6809 || cpu == cpu_6809e) {
     Serial.println("t firq 0|1           - Trigger on /FIRQ level");
   }
   Serial.println("t nmi 0|1            - Trigger on /NMI level");
@@ -767,7 +771,7 @@ void list(Stream &stream, int start, int end)
         }
       }
 
-      if (cpu == cpu_6809) {
+      if (cpu == cpu_6809 || cpu == cpu_6809e) {
         if (control[i] & 0x08) {
           cycle = "R";
           opcode = opcodes_6809[data[i]];
@@ -869,7 +873,7 @@ void list(Stream &stream, int start, int end)
       }
 
       // Check for 6809 /RESET, /IRQ, or /NMI active, vector address.
-      if (cpu == cpu_6809) {
+      if (cpu == cpu_6809 || cpu == cpu_6809e) {
         if (!(control[i] & 0x04)) {
           comment = "RESET ACTIVE";
         } else if (!(control[i] & 0x02)) {
@@ -948,7 +952,7 @@ void exportCSV(Stream &stream)
   if ((cpu == cpu_65c02) || (cpu == cpu_6502)) {
     stream.println("Index,SYNC,R/W,/RESET,/IRQ,/NMI,Address,Data");
   }
-  if (cpu == cpu_6809) {
+  if (cpu == cpu_6809 || cpu == cpu_6809e) {
     stream.println("Index,R/W,/RESET,/IRQ,/NMI,Address,Data");
   }
   if (cpu == cpu_6800) {
@@ -969,7 +973,7 @@ void exportCSV(Stream &stream)
     if ((cpu == cpu_65c02) || (cpu == cpu_6502)) {
       sync = control[i] & 0x10;
     }
-    if ((cpu == cpu_65c02) || (cpu == cpu_6502) || (cpu == cpu_6800) || (cpu == cpu_6809)) {
+    if ((cpu == cpu_65c02) || (cpu == cpu_6502) || (cpu == cpu_6800) || (cpu == cpu_6809) || (cpu == cpu_6809e)) {
       rw = control[i] & 0x08;
       reset = control[i] & 0x04;
       irq = control[i] & 0x02;
@@ -1012,7 +1016,7 @@ void exportCSV(Stream &stream)
               data[i]
              );
     }
-    if (cpu == cpu_6809) {
+    if (cpu == cpu_6809 || cpu == cpu_6809e) {
       sprintf(output, "%d,%c,%c,%c,%c,%04lX,%02lX",
               j,
               rw ? '1' : '0',
@@ -1156,7 +1160,7 @@ void go()
       which_c_trigger = CC_Z80_INT;
     }
   } else if (triggerMode == tr_firq) {
-    if (cpu == cpu_6809) {
+    if (cpu == cpu_6809 || cpu == cpu_6809e) {
       which_c_trigger = CC_6809_FIRQ;
     }
   } else if (triggerMode == tr_nmi) {
@@ -1192,7 +1196,7 @@ void go()
       WAIT_PHI2_LOW;
       WAIT_PHI2_HIGH;
     }
-    if (cpu == cpu_6809) {
+    if (cpu == cpu_6809 || cpu == cpu_6809e) {
       // Wait for Q to go from low to high
       WAIT_Q_LOW;
       WAIT_Q_HIGH;
@@ -1212,7 +1216,7 @@ void go()
       WAIT_PHI2_HIGH;
       WAIT_PHI2_LOW;
     }
-    if (cpu == cpu_6809) {
+    if (cpu == cpu_6809 || cpu == cpu_6809e) {
       // Wait for E to go from high to low
       WAIT_E_HIGH;
       WAIT_E_LOW;
@@ -1301,6 +1305,8 @@ void loop() {
       cpu = cpu_6800;
     } else if (cmd == "c 6809") {
       cpu = cpu_6809;
+    } else if ((cmd == "c 6809e") || (cmd == "c 6809E")) {
+      cpu = cpu_6809e;
     } else if ((cmd == "c z80") || (cmd == "c Z80")) {
       cpu = cpu_z80;
 
@@ -1354,10 +1360,10 @@ void loop() {
     } else if ((cpu != cpu_z80) && (cmd == "t irq 1")) {
       triggerMode = tr_irq;
       triggerLevel = true;
-    } else if ((cpu == cpu_6809) && (cmd == "t firq 0")) {
+    } else if ((cpu == cpu_6809 || cpu == cpu_6809e) && (cmd == "t firq 0")) {
       triggerMode = tr_firq;
       triggerLevel = false;
-    } else if ((cpu == cpu_6809) && (cmd == "t firq 1")) {
+    } else if ((cpu == cpu_6809 || cpu == cpu_6809e) && (cmd == "t firq 1")) {
       triggerMode = tr_firq;
       triggerLevel = true;
     } else if (cmd == "t nmi 0") {
