@@ -3,11 +3,16 @@
   Logic Analyzer for 6502, 6800, 6809, or Z80 microprocessors based on a
   Teensy 4.1 microcontroller.
 
-  See https://github.com/jefftranter/6502/tree/master/LogicAnalyzer
+  See https://github.com/thorpej/TeensyLogicAnalyzer
+
+  Based on https://github.com/jefftranter/6502/tree/master/LogicAnalyzer
 
   Copyright (c) 2021-2022 by Jeff Tranter <tranter@pobox.com>
+  Copyright (c) 2022 by Jason R. Thorpe <thorpej@me.com>
 
   To Do:
+  - Add support for BS, BA, /HALT, and /FIRQ lines on 6809 & 6809E.
+  - Add support for LIC on 6809E.
   - Add support for Z80 control line triggers.
   - Add support for Z80 I/O read or write trigger.
 
@@ -31,7 +36,8 @@
 // able to go up to at least 30,000 before running out of memory.
 #define BUFFSIZE 5000
 
-const char *versionString = "Logic Analyzer version 0.30 by Jeff Tranter <tranter@pobox.com>";
+const char *versionString = "TeensyLogicAnalyzer version 0.1 by Jason R. Thorpe <thorpej@me.com>";
+const char *origVersionString = "Based on Logic Analyzer version 0.30 by Jeff Tranter <tranter@pobox.com>";
 
 // Type definitions
 typedef enum { tr_address, tr_io, tr_data, tr_reset, tr_irq, tr_nmi, tr_none } trigger_t;
@@ -353,16 +359,6 @@ const char *opcodes_6809[256] = {
 #define CC7_BITMASK       (1U << 7)
 // XXX  CC8_BITMASK       (1U << 8)
 
-#define CCxx_PSR          CORE_PIN2_PINREG
-#define CC0_PIN_BITMASK   CORE_PIN2_BITMASK
-#define CC1_PIN_BITMASK   CORE_PIN3_BITMASK
-#define CC2_PIN_BITMASK   CORE_PIN4_BITMASK
-#define CC3_PIN_BITMASK   CORE_PIN5_BITMASK
-#define CC4_PIN_BITMASK   CORE_PIN29_BITMASK
-#define CC5_PIN_BITMASK   CORE_PIN33_BITMASK
-#define CC6_PIN_BITMASK   CORE_PIN38_BITMASK  // in CAxx_PSR
-#define CC7_PIN_BITMASK   CORE_PIN34_BITMASK  // in CDxx_PSR
-
 #define CC_6502_PHI2      CC0_BITMASK
 #define CC_6502_SYNC      CC1_BITMASK
 #define CC_6502_RW        CC2_BITMASK
@@ -408,7 +404,7 @@ const char *opcodes_6809[256] = {
 #define CC_Z80_WR         CC5_BITMASK
 #define CC_Z80_RESET      CC6_BITMASK
 #define CC_Z80_INT        CC7_BITMASK
-// XXX  CC_Z80_NMI        CC8_BITMASK     // right now, board requires a jumper
+// XXX  CC_Z80_NMI        CC8_BITMASK
 
 #define CC_Z80_CLK_PIN    CC0_PIN
 #define CC_Z80_M1_PIN     CC1_PIN
@@ -567,6 +563,7 @@ void setup() {
 
   Serial.setTimeout(60000);
   Serial.println(versionString);
+  Serial.println(origVersionString);
   Serial.println("Type h or ? for help.");
 }
 
