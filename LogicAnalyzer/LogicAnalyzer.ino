@@ -694,10 +694,11 @@ void help()
   } else {
     Serial.println("t irq 0|1            - Trigger on /IRQ level");
   }
+  if (cpu == cpu_6809) {
+    Serial.println("t firq 0|1           - Trigger on /FIRQ level");
+  }
   if (cpu != cpu_z80) {
     Serial.println("t nmi 0|1            - Trigger on /NMI level");
-    Serial.println("t spare1 0|1         - Trigger on SPARE1 level");
-    Serial.println("t spare2 0|1         - Trigger on SPARE2 level");
   }
   Serial.println("t none               - Trigger freerun");
   Serial.println("g                    - Go/start analyzer");
