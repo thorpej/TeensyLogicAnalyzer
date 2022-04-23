@@ -391,6 +391,10 @@ const char *opcodes_6809[256] = {
 #define CC_6800_RESET     CC3_BITMASK         // same as 6502
 #define CC_6800_IRQ       CC4_BITMASK         // same as 6502
 #define CC_6800_NMI       CC5_BITMASK         // same as 6502
+#define CC_6800_HALT      CC6_BITMASK
+#define CC_6800_DBE       CC7_BITMASK
+#define CC_6800_BA        CC8_BITMASK
+#define CC_6800_TSC       CC10_BITMASK
 
 #define CC_6800_PHI2_PIN  CC0_PIN
 
