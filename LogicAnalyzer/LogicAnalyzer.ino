@@ -381,6 +381,7 @@ const char *opcodes_6809[256] = {
 #define CC_6502_RESET     CC3_BITMASK
 #define CC_6502_IRQ       CC4_BITMASK
 #define CC_6502_NMI       CC5_BITMASK
+#define CC_6502_RDY       CC6_BITMASK
 
 #define CC_6502_PHI2_PIN  CC0_PIN
 
