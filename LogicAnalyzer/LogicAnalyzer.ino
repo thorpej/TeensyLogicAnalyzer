@@ -1196,8 +1196,8 @@ void go()
     }
 
     // Read address and control lines
-    control[i] = GPIO9_PSR;
-    address[i] = GPIO6_PSR;
+    control[i] = CCxx_PSR;
+    address[i] = CAxx_PSR;
 
     if ((cpu == cpu_65c02) || (cpu == cpu_6502) || (cpu == cpu_6800)) {
       // Wait for PHI2 to go from high to low
@@ -1216,7 +1216,7 @@ void go()
     }
 
     // Read data lines
-    data[i] = GPIO7_PSR;
+    data[i] = CDxx_PSR;
 
     // Set triggered flag if trigger button pressed or trigger seen
     // If triggered, increment buffer index
