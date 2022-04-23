@@ -40,7 +40,7 @@ const char *versionString = "TeensyLogicAnalyzer version 0.1 by Jason R. Thorpe 
 const char *origVersionString = "Based on Logic Analyzer version 0.30 by Jeff Tranter <tranter@pobox.com>";
 
 // Type definitions
-typedef enum { tr_address, tr_io, tr_data, tr_reset, tr_irq, tr_nmi, tr_none } trigger_t;
+typedef enum { tr_address, tr_io, tr_data, tr_reset, tr_irq, tr_firq, tr_nmi, tr_none } trigger_t;
 typedef enum { tr_read, tr_write, tr_either } cycle_t;
 typedef enum { cpu_6502, cpu_65c02, cpu_6800, cpu_6809, cpu_z80 } cpu_t;
 
@@ -660,6 +660,12 @@ void help()
       }
       Serial.println(triggerLevel ? "high" : "low");
       break;
+    case tr_firq:
+      if (cpu == cpu_6809) {
+        Serial.print("on /FIRQ ");
+        Serial.println(triggerLevel ? "high" : "low");
+      }
+      break;
     case tr_nmi:
       Serial.print("on /NMI ");
       Serial.println(triggerLevel ? "high" : "low");
@@ -1150,6 +1156,10 @@ void go()
     } else {
       which_c_trigger = CC_Z80_INT;
     }
+  } else if (triggerMode == tr_firq) {
+    if (cpu == cpu_6809) {
+      which_c_trigger = CC_6809_FIRQ;
+    }
   } else if (triggerMode == tr_nmi) {
     if (cpu != cpu_z80) {
       // 6502, 6800, 6809 -- all 6800-like
@@ -1344,6 +1354,12 @@ void loop() {
       triggerLevel = false;
     } else if ((cpu != cpu_z80) && (cmd == "t irq 1")) {
       triggerMode = tr_irq;
+      triggerLevel = true;
+    } else if ((cpu == cpu_6809) && (cmd == "t firq 0")) {
+      triggerMode = tr_firq;
+      triggerLevel = false;
+    } else if ((cpu == cpu_6809) && (cmd == "t firq 1")) {
+      triggerMode = tr_firq;
       triggerLevel = true;
     } else if (cmd == "t nmi 0") {
       triggerMode = tr_nmi;
