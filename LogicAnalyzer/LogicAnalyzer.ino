@@ -31,38 +31,10 @@
 // able to go up to at least 30,000 before running out of memory.
 #define BUFFSIZE 5000
 
-// Some pin numbers
-#define BUTTON 31
-#define CLK 2
-#define E 2
-#define INT 34
-#define IORQ 5
-#define IRQ 29
-#define M1 3
-#define MREQ 4
-#define NMI 33
-#define PHI2 2
-#define Q 3
-#define RD 29
-#define RESET 5
-#define RW 4
-#define VMA 3
-#define WR 33
-
 const char *versionString = "Logic Analyzer version 0.30 by Jeff Tranter <tranter@pobox.com>";
 
-// Macros
-#define WAIT_PHI2_LOW while (digitalReadFast(PHI2) == HIGH) ;
-#define WAIT_PHI2_HIGH while (digitalReadFast(PHI2) == LOW) ;
-#define WAIT_Q_LOW while (digitalReadFast(Q) == HIGH) ;
-#define WAIT_Q_HIGH while (digitalReadFast(Q) == LOW) ;
-#define WAIT_E_LOW while (digitalReadFast(E) == HIGH) ;
-#define WAIT_E_HIGH while (digitalReadFast(E) == LOW) ;
-#define WAIT_CLK_LOW while (digitalReadFast(CLK) == HIGH) ;
-#define WAIT_CLK_HIGH while (digitalReadFast(CLK) == LOW) ;
-
 // Type definitions
-typedef enum { tr_address, tr_io, tr_data, tr_reset, tr_irq, tr_nmi, tr_spare1, tr_spare2, tr_none } trigger_t;
+typedef enum { tr_address, tr_io, tr_data, tr_reset, tr_irq, tr_nmi, tr_none } trigger_t;
 typedef enum { tr_read, tr_write, tr_either } cycle_t;
 typedef enum { cpu_6502, cpu_65c02, cpu_6800, cpu_6809, cpu_z80 } cpu_t;
 
@@ -267,6 +239,321 @@ const char *opcodes_6809[256] = {
   "EORB", "ADCB", "ORB", "ADDB", "LDD", "STD", "LDU", "STU"
 };
 
+//
+// MASTER TABLE OF Teensy 4.1 DIGITAL I/O PINS
+// In general, these inputs are grouped so e.g. CPU data and address lines can all be read
+// from a single 32-bit GPIO port register.
+//
+//  0 (1.3)  - CA0
+//  1 (1.2)  - CA1
+//  2 (4.4)  - CC0
+//  3 (4.5)  - CC1
+//  4 (4.6)  - CC2
+//  5 (4.8)  - CC3
+//  6 (2.10) - CD0
+//  7 (2.17) - CD1
+//  8 (2.16) - CD2
+//  9 (2.11) - CD3
+// 10 (2.0)  - CD4
+// 11 (2.2)  - CD5
+// 12 (2.1)  - CD6
+// 13 -- on-board LED
+// 14 (1.18) - CA2
+// 15 (1.19) - CA3
+// 16 (1.23) - CA4
+// 17 (1.22) - CA5
+// 18 (1.17) - CA6
+// 19 (1.16) - CA7
+// 20 (1.26) - CA8
+// 21 (1.27) - CA9
+// 22 (1.24) - CA10
+// 23 (1.25) - CA11
+// 24 (1.12) - CA12
+// 25 (1.13) - CA13
+// 26 (1.30) - CA14
+// 27 (1.31) - CA15
+// 28 (3.18)
+// 29 (4.31) - CC4
+// 30 -- data bus direction
+// 31 -- trigger button
+// 32 (2.12) - CD7
+// 33 (4.7)  - CC5
+// 34 (2.29) - CC7
+// 35 (2.28)
+// 36 (2.18)
+// 37 (2.19)
+// 38 (1.28) - CC6
+// 39 (1.29)
+// 40 (1.20)
+// 41 (1.21)
+
+#define DBUS_DIR_PIN      30
+#define BUTTON_PIN        31
+
+#define CAxx_PSR          CORE_PIN0_PINREG   // All CAxx lines are in the same GPIO port
+#define CA0_PIN_BITMASK   CORE_PIN0_BITMASK
+#define CA1_PIN_BITMASK   CORE_PIN1_BITMASK
+#define CA2_PIN_BITMASK   CORE_PIN14_BITMASK
+#define CA3_PIN_BITMASK   CORE_PIN15_BITMASK
+#define CA4_PIN_BITMASK   CORE_PIN16_BITMASK
+#define CA5_PIN_BITMASK   CORE_PIN17_BITMASK
+#define CA6_PIN_BITMASK   CORE_PIN18_BITMASK
+#define CA7_PIN_BITMASK   CORE_PIN19_BITMASK
+#define CA8_PIN_BITMASK   CORE_PIN20_BITMASK
+#define CA9_PIN_BITMASK   CORE_PIN21_BITMASK
+#define CA10_PIN_BITMASK  CORE_PIN22_BITMASK
+#define CA11_PIN_BITMASK  CORE_PIN23_BITMASK
+#define CA12_PIN_BITMASK  CORE_PIN24_BITMASK
+#define CA13_PIN_BITMASK  CORE_PIN25_BITMASK
+#define CA14_PIN_BITMASK  CORE_PIN26_BITMASK
+#define CA15_PIN_BITMASK  CORE_PIN27_BITMASK
+
+#define CDxx_PSR          CORE_PIN6_PINREG    // All CDxx lines are in the same GPIO port  
+#define CD0_PIN_BITMASK   CORE_PIN6_BITMASK
+#define CD1_PIN_BITMASK   CORE_PIN7_BITMASK
+#define CD2_PIN_BITMASK   CORE_PIN8_BITMASK
+#define CD3_PIN_BITMASK   CORE_PIN9_BITMASK
+#define CD4_PIN_BITMASK   CORE_PIN10_BITMASK
+#define CD5_PIN_BITMASK   CORE_PIN11_BITMASK
+#define CD6_PIN_BITMASK   CORE_PIN12_BITMASK
+#define CD7_PIN_BITMASK   CORE_PIN32_BITMASK
+
+// Control signals are grouped into physical inputs (CCxx_PIN_BITMASK),
+// and their logical equivalents (CCxx_BITMASK).  The logical equivalants,
+// once normalized re then grouped into their per-CPU meanings (CC_xxx_yyy).
+
+#define CCxx_PSR          CORE_PIN2_PINREG
+#define CC0_PIN_BITMASK   CORE_PIN2_BITMASK
+#define CC1_PIN_BITMASK   CORE_PIN3_BITMASK
+#define CC2_PIN_BITMASK   CORE_PIN4_BITMASK
+#define CC3_PIN_BITMASK   CORE_PIN5_BITMASK
+#define CC4_PIN_BITMASK   CORE_PIN29_BITMASK
+#define CC5_PIN_BITMASK   CORE_PIN33_BITMASK
+#define CC6_PIN_BITMASK   CORE_PIN38_BITMASK  // in CAxx_PSR
+#define CC7_PIN_BITMASK   CORE_PIN34_BITMASK  // in CDxx_PSR
+
+// We need to poll certain CC pins, so define constants for
+// them here.
+#define CC0_PIN           2
+#define CC1_PIN           3
+#define CC2_PIN           4
+#define CC3_PIN           5
+#define CC4_PIN           29
+#define CC5_PIN           33
+#define CC6_PIN           38
+#define CC7_PIN           34
+
+#define CC0_BITMASK       (1U << 0)
+#define CC1_BITMASK       (1U << 1)
+#define CC2_BITMASK       (1U << 2)
+#define CC3_BITMASK       (1U << 3)
+#define CC4_BITMASK       (1U << 4)
+#define CC5_BITMASK       (1U << 5)
+#define CC6_BITMASK       (1U << 6)
+#define CC7_BITMASK       (1U << 7)
+// XXX  CC8_BITMASK       (1U << 8)
+
+#define CCxx_PSR          CORE_PIN2_PINREG
+#define CC0_PIN_BITMASK   CORE_PIN2_BITMASK
+#define CC1_PIN_BITMASK   CORE_PIN3_BITMASK
+#define CC2_PIN_BITMASK   CORE_PIN4_BITMASK
+#define CC3_PIN_BITMASK   CORE_PIN5_BITMASK
+#define CC4_PIN_BITMASK   CORE_PIN29_BITMASK
+#define CC5_PIN_BITMASK   CORE_PIN33_BITMASK
+#define CC6_PIN_BITMASK   CORE_PIN38_BITMASK  // in CAxx_PSR
+#define CC7_PIN_BITMASK   CORE_PIN34_BITMASK  // in CDxx_PSR
+
+#define CC_6502_PHI2      CC0_BITMASK
+#define CC_6502_SYNC      CC1_BITMASK
+#define CC_6502_RW        CC2_BITMASK
+#define CC_6502_RESET     CC3_BITMASK
+#define CC_6502_IRQ       CC4_BITMASK
+#define CC_6502_NMI       CC5_BITMASK
+
+#define CC_6502_PHI2_PIN  CC0_PIN
+#define CC_6502_RW_PIN    CC2_PIN
+#define CC_6502_RESET_PIN CC3_PIN
+
+#define CC_6800_PHI2      CC0_BITMASK         // same as 6502
+#define CC_6800_VMA       CC1_BITMASK
+#define CC_6800_RW        CC2_BITMASK         // same as 6502
+#define CC_6800_RESET     CC3_BITMASK         // same as 6502
+#define CC_6800_IRQ       CC4_BITMASK         // same as 6502
+#define CC_6800_NMI       CC5_BITMASK         // same as 6502
+
+#define CC_6800_PHI2_PIN  CC0_PIN
+#define CC_6800_RW_PIN    CC2_PIN
+#define CC_6800_RESET_PIN CC3_PIN
+
+#define CC_6809_E         CC0_BITMASK
+#define CC_6809_Q         CC1_BITMASK
+#define CC_6809_RW        CC2_BITMASK         // same as 6502
+#define CC_6809_RESET     CC3_BITMASK         // same as 6502
+#define CC_6809_IRQ       CC4_BITMASK         // same as 6502
+#define CC_6809_NMI       CC5_BITMASK         // same as 6502
+// XXX  CC_6809_FIRQ      CC6_BITMASK
+// XXX  CC_6809_BA        CC7_BITMASK
+// XXX  CC_6809E_LIC      CC8_BITMASK
+
+#define CC_6809_E_PIN     CC0_PIN
+#define CC_6809_Q_PIN     CC1_PIN
+#define CC_6809_RW_PIN    CC2_PIN
+#define CC_6809_RESET_PIN CC3_PIN
+
+#define CC_Z80_CLK        CC0_BITMASK
+#define CC_Z80_M1         CC1_BITMASK
+#define CC_Z80_MREQ       CC2_BITMASK
+#define CC_Z80_IORQ       CC3_BITMASK
+#define CC_Z80_RD         CC4_BITMASK
+#define CC_Z80_WR         CC5_BITMASK
+#define CC_Z80_RESET      CC6_BITMASK
+#define CC_Z80_INT        CC7_BITMASK
+// XXX  CC_Z80_NMI        CC8_BITMASK     // right now, board requires a jumper
+
+#define CC_Z80_CLK_PIN    CC0_PIN
+#define CC_Z80_M1_PIN     CC1_PIN
+#define CC_Z80_MREQ_PIN   CC2_PIN
+#define CC_Z80_IORQ_PIN   CC3_PIN
+#define CC_Z80_RD_PIN     CC4_PIN
+#define CC_Z80_WR_PIN     CC5_PIN
+#define CC_Z80_INT_PIN    CC7_PIN
+
+// Macros
+#define WAIT_PHI2_LOW while (digitalReadFast(CC_6502_PHI2_PIN) == HIGH) ;
+#define WAIT_PHI2_HIGH while (digitalReadFast(CC_6502_PHI2_PIN) == LOW) ;
+#define WAIT_Q_LOW while (digitalReadFast(CC_6809_Q) == HIGH) ;
+#define WAIT_Q_HIGH while (digitalReadFast(CC_6809_Q) == LOW) ;
+#define WAIT_E_LOW while (digitalReadFast(CC_6809_E) == HIGH) ;
+#define WAIT_E_HIGH while (digitalReadFast(CC_6809_E) == LOW) ;
+#define WAIT_CLK_LOW while (digitalReadFast(CC_Z80_CLK_PIN) == HIGH) ;
+#define WAIT_CLK_HIGH while (digitalReadFast(CC_Z80_CLK_PIN) == LOW) ;
+
+#define cpu_6800like_rw   (cpu == cpu_6502 || cpu == cpu_65c02 || \
+                           cpu == cpu_6800 || cpu == cpu_6809)
+
+#define cpu_6800like_reset (cpu == cpu_6502 || cpu == cpu_65c02 || \
+                            cpu == cpu_6800 || cpu == cpu_6809)
+
+#define cpu_6800like_irq  (cpu == cpu_6502 || cpu == cpu_65c02 || \
+                           cpu == cpu_6800 || cpu == cpu_6809)
+
+#define cpu_6800like_nmi  (cpu == cpu_6502 || cpu == cpu_65c02 || \
+                           cpu == cpu_6800 || cpu == cpu_6809)
+
+uint32_t
+scramble_CAxx(uint32_t ca)
+{
+  return ((ca & (1U <<  0)) ?  CA0_PIN_BITMASK : 0) |
+         ((ca & (1U <<  1)) ?  CA1_PIN_BITMASK : 0) |
+         ((ca & (1U <<  2)) ?  CA2_PIN_BITMASK : 0) |
+         ((ca & (1U <<  3)) ?  CA3_PIN_BITMASK : 0) |
+         ((ca & (1U <<  4)) ?  CA4_PIN_BITMASK : 0) |
+         ((ca & (1U <<  5)) ?  CA5_PIN_BITMASK : 0) |
+         ((ca & (1U <<  6)) ?  CA6_PIN_BITMASK : 0) |
+         ((ca & (1U <<  7)) ?  CA7_PIN_BITMASK : 0) |
+         ((ca & (1U <<  8)) ?  CA8_PIN_BITMASK : 0) |
+         ((ca & (1U <<  9)) ?  CA9_PIN_BITMASK : 0) |
+         ((ca & (1U << 10)) ? CA10_PIN_BITMASK : 0) |
+         ((ca & (1U << 11)) ? CA11_PIN_BITMASK : 0) |
+         ((ca & (1U << 12)) ? CA12_PIN_BITMASK : 0) |
+         ((ca & (1U << 13)) ? CA13_PIN_BITMASK : 0) |
+         ((ca & (1U << 14)) ? CA14_PIN_BITMASK : 0) |
+         ((ca & (1U << 15)) ? CA15_PIN_BITMASK : 0);
+}
+
+int32_t
+unscramble_CAxx(uint32_t reg)
+{
+  return ((reg &  CA0_PIN_BITMASK) ? (1U <<  0) : 0) |
+         ((reg &  CA1_PIN_BITMASK) ? (1U <<  1) : 0) |
+         ((reg &  CA2_PIN_BITMASK) ? (1U <<  2) : 0) |
+         ((reg &  CA3_PIN_BITMASK) ? (1U <<  3) : 0) |
+         ((reg &  CA4_PIN_BITMASK) ? (1U <<  4) : 0) |
+         ((reg &  CA5_PIN_BITMASK) ? (1U <<  5) : 0) |
+         ((reg &  CA6_PIN_BITMASK) ? (1U <<  6) : 0) |
+         ((reg &  CA7_PIN_BITMASK) ? (1U <<  7) : 0) |
+         ((reg &  CA8_PIN_BITMASK) ? (1U <<  8) : 0) |
+         ((reg &  CA9_PIN_BITMASK) ? (1U <<  9) : 0) |
+         ((reg & CA10_PIN_BITMASK) ? (1U << 10) : 0) |
+         ((reg & CA11_PIN_BITMASK) ? (1U << 11) : 0) |
+         ((reg & CA12_PIN_BITMASK) ? (1U << 12) : 0) |
+         ((reg & CA13_PIN_BITMASK) ? (1U << 13) : 0) |
+         ((reg & CA14_PIN_BITMASK) ? (1U << 14) : 0) |
+         ((reg & CA15_PIN_BITMASK) ? (1U << 15) : 0);
+}
+
+uint32_t
+scramble_CDxx(uint32_t cd)
+{
+    return ((cd & (1U << 0)) ? CD0_PIN_BITMASK : 0) |
+           ((cd & (1U << 1)) ? CD1_PIN_BITMASK : 0) |
+           ((cd & (1U << 2)) ? CD2_PIN_BITMASK : 0) |
+           ((cd & (1U << 3)) ? CD3_PIN_BITMASK : 0) |
+           ((cd & (1U << 4)) ? CD4_PIN_BITMASK : 0) |
+           ((cd & (1U << 5)) ? CD5_PIN_BITMASK : 0) |
+           ((cd & (1U << 6)) ? CD6_PIN_BITMASK : 0) |
+           ((cd & (1U << 7)) ? CD7_PIN_BITMASK : 0);
+}
+
+uint32_t
+unscramble_CDxx(uint32_t reg)
+{
+  return ((reg & CD0_PIN_BITMASK) ? (1U << 0) : 0) |
+         ((reg & CD1_PIN_BITMASK) ? (1U << 1) : 0) |
+         ((reg & CD2_PIN_BITMASK) ? (1U << 2) : 0) |
+         ((reg & CD3_PIN_BITMASK) ? (1U << 3) : 0) |
+         ((reg & CD4_PIN_BITMASK) ? (1U << 4) : 0) |
+         ((reg & CD5_PIN_BITMASK) ? (1U << 5) : 0) |
+         ((reg & CD6_PIN_BITMASK) ? (1U << 6) : 0) |
+         ((reg & CD7_PIN_BITMASK) ? (1U << 7) : 0);
+}
+
+uint32_t
+scramble_CCxx(uint32_t cc, uint32_t *aregp, uint32_t *dregp)
+{
+  if (cc & CC6_BITMASK) {
+    *aregp |= CC6_PIN_BITMASK;
+  }
+  if (cc & CC7_BITMASK) {
+    *dregp |= CC7_PIN_BITMASK;
+  }
+  return ((cc & CC0_BITMASK) ? CC0_PIN_BITMASK : 0) |
+         ((cc & CC1_BITMASK) ? CC1_PIN_BITMASK : 0) |
+         ((cc & CC2_BITMASK) ? CC2_PIN_BITMASK : 0) |
+         ((cc & CC3_BITMASK) ? CC3_PIN_BITMASK : 0) |
+         ((cc & CC4_BITMASK) ? CC4_PIN_BITMASK : 0) |
+         ((cc & CC5_BITMASK) ? CC5_PIN_BITMASK : 0);
+}
+
+uint32_t
+unscramble_CCxx(uint32_t creg, uint32_t areg, uint32_t dreg)
+{
+  return ((creg & CC0_PIN_BITMASK) ? CC0_BITMASK : 0) |
+         ((creg & CC1_PIN_BITMASK) ? CC1_BITMASK : 0) |
+         ((creg & CC2_PIN_BITMASK) ? CC2_BITMASK : 0) |
+         ((creg & CC3_PIN_BITMASK) ? CC3_BITMASK : 0) |
+         ((creg & CC4_PIN_BITMASK) ? CC4_BITMASK : 0) |
+         ((creg & CC5_PIN_BITMASK) ? CC5_BITMASK : 0) |
+         // CC6 is in the areg
+         ((areg & CC6_PIN_BITMASK) ? CC6_BITMASK : 0) |
+         // CC7 is in the dreg
+         ((dreg & CC7_PIN_BITMASK) ? CC7_BITMASK : 0);
+}
+
+// Rearrange sampled bits of data in buffer back into address, data,
+// and control lines.
+void
+unscramble(void)
+{
+  for (int i = 0; i < samples; i++) {
+    // Unscramble control signals first; some of them have bits in
+    // the data and address line GPIO ports.
+    control[i] = unscramble_CCxx(control[i], address[i], data[i]);
+    address[i] = unscramble_CAxx(address[i]);
+    data[i]    = unscramble_CDxx(data[i]);
+   }
+}
+
 // Startup function
 void setup() {
 
@@ -279,11 +566,11 @@ void setup() {
   pinMode(CORE_LED0_PIN, OUTPUT);
 
   // Manual trigger button - low on this pin forces a trigger.
-  attachInterrupt(digitalPinToInterrupt(BUTTON), triggerButton, FALLING);
+  attachInterrupt(digitalPinToInterrupt(BUTTON_PIN), triggerButton, FALLING);
 
   // Data bus direction - output low to default to reading data bus.
-  pinMode(30, OUTPUT);
-  digitalWriteFast(30, LOW);
+  pinMode(DBUS_DIR_PIN, OUTPUT);
+  digitalWriteFast(DBUS_DIR_PIN, LOW);
 
   Serial.begin(115200);
   while (!Serial) {
@@ -388,14 +675,6 @@ void help()
       break;
     case tr_nmi:
       Serial.print("on /NMI ");
-      Serial.println(triggerLevel ? "high" : "low");
-      break;
-    case tr_spare1:
-      Serial.print("on SPARE1 ");
-      Serial.println(triggerLevel ? "high" : "low");
-      break;
-    case tr_spare2:
-      Serial.print("on SPARE2 ");
       Serial.println(triggerLevel ? "high" : "low");
       break;
     case tr_none:
@@ -827,124 +1106,77 @@ void writeSD()
 // Start recording.
 void go()
 {
+  aTriggerBits = 0;
+  aTriggerMask = 0;
+  dTriggerBits = 0;
+  dTriggerMask = 0;
+  cTriggerBits = 0;
+  cTriggerMask = 0;
+
+  uint32_t which_c_trigger = 0;
+  
   // Scramble the trigger address, control, and data lines to match what we will read on the ports.
   if (triggerMode == tr_address) {
-    // GPIO port 6 pins:
-    // GPIO:   31  30  29  28  27  26  25  24  23  22  21  20  19  18  17  16  15  14  13  12  11  10  09  08  07  06  05  04  03  02  01  00
-    // 6502:  A15 A14  XXX SP1 A09 A08 A11 A10 A04 A05 XXX XXX A03 A02 A06 A07 XXX XXX A13 A12 XXX XXX XXX XXX XXX XXX XXX XXX A00 A01 XXX XXX
-    aTriggerBits = ((triggerAddress & 0x0001) << (3 - 0)) // A0
-                   + ((triggerAddress & 0x0002) << (2 - 1)) // A1
-                   + ((triggerAddress & 0x0004) << (18 - 2)) // A2
-                   + ((triggerAddress & 0x0008) << (19 - 3)) // A3
-                   + ((triggerAddress & 0x0010) << (23 - 4)) // A4
-                   + ((triggerAddress & 0x0020) << (22 - 5)) // A5
-                   + ((triggerAddress & 0x0040) << (17 - 6)) // A6
-                   + ((triggerAddress & 0x0080) << (16 - 7)) // A7
-                   + ((triggerAddress & 0x0100) << (26 - 8)) // A8
-                   + ((triggerAddress & 0x0200) << (27 - 9)) // A9
-                   + ((triggerAddress & 0x0400) << (24 - 10)) // A10
-                   + ((triggerAddress & 0x0800) << (25 - 11)) // A11
-                   + ((triggerAddress & 0x1000) << (12 - 12)) // A12
-                   + ((triggerAddress & 0x2000) << (13 - 13)) // A13
-                   + ((triggerAddress & 0x4000) << (30 - 14)) // A14
-                   + ((triggerAddress & 0x8000) << (31 - 15)); // A15
-    aTriggerMask = 0b11001111110011110011000000001100;
-    dTriggerBits = 0;
-    dTriggerMask = 0;
+    aTriggerBits = scramble_CAxx(triggerAddress);
+    aTriggerMask = scramble_CAxx(0xffff);
 
     // Check for r/w qualifer
-    if (triggerCycle == tr_read) {
-      cTriggerBits = 0b00000000000000000000000001000000;
-      cTriggerMask = 0b00000000000000000000000001000000;
-    } else if (triggerCycle == tr_write) {
-      cTriggerBits = 0b00000000000000000000000000000000;
-      cTriggerMask = 0b00000000000000000000000001000000;
+    if (cpu != cpu_z80) {
+      // 6502, 6800, 6809 -- all 6800-like
+      cTriggerMask = scramble_CCxx(CC_6800_RW, &aTriggerMask, &dTriggerMask);
+      if (triggerCycle == tr_read) {
+        cTriggerBits = scramble_CCxx(CC_6800_RW, &aTriggerBits, &dTriggerBits);
+      }
     } else {
-      cTriggerBits = 0;
-      cTriggerMask = 0;
+      // TODO: r/w qualifier for Z80
     }
-
   } else if (triggerMode == tr_data) {
-    // GPIO port 7 pins:
-    // GPIO:   31  30  29  28  27  26  25  24  23  22  21  20  19  18  17  16  15  14  13  12  11  10  09  08  07  06  05  04  03  02  01  00
-    // 6502:  XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX D01 D02 XXX XXX XXX D07 D03 D00 SP2 XXX XXX XXX XXX XXX LED D05 D06 D04
-    dTriggerBits = ((triggerAddress & 0x0001) << (10 - 0)) // D0
-                   + ((triggerAddress & 0x0002) << (17 - 1)) // D1
-                   + ((triggerAddress & 0x0004) << (16 - 2)) // D2
-                   + ((triggerAddress & 0x0008) << (11 - 3)) // D3
-                   + ((triggerAddress & 0x0010) >> (4 - 0)) // D4
-                   + ((triggerAddress & 0x0020) >> (5 - 2)) // D5
-                   + ((triggerAddress & 0x0040) >> (6 - 1)) // D6
-                   + ((triggerAddress & 0x0080) << (12 - 7)); // D7
-    dTriggerMask = 0b00000000000000110001110000000111;
-    aTriggerBits = 0;
-    aTriggerMask = 0;
-
-    // TODO: Add support for Z80 I/O read or write trigger.
+    dTriggerBits = scramble_CDxx(triggerAddress);
+    dTriggerMask = scramble_CDxx(0xff);
 
     // Check for r/w qualifier
-    if (triggerCycle == tr_read) {
-      cTriggerBits = 0b00000000000000000000000001000000;
-      cTriggerMask = 0b00000000000000000000000001000000;
-    } else if (triggerCycle == tr_write) {
-      cTriggerBits = 0b00000000000000000000000000000000;
-      cTriggerMask = 0b00000000000000000000000001000000;
+    if (cpu != cpu_z80) {
+      // 6502, 6800, 6809 -- all 6800-like
+      cTriggerMask = scramble_CCxx(CC_6800_RW, &aTriggerMask, &dTriggerMask);
+      if (triggerCycle == tr_read) {
+        cTriggerBits = scramble_CCxx(CC_6800_RW, &aTriggerBits, &dTriggerBits);
+      }
     } else {
-      cTriggerBits = 0;
-      cTriggerMask = 0;
+      // TODO: r/w qualifier for Z80
     }
+
+    // TODO: Add support for Z80 I/O read or write trigger.
 
     // TODO: Add support for Z80 I/O control line triggers.
 
   } else if (triggerMode == tr_reset) {
-    // GPIO port 9 pins:
-    // GPIO:   31  30  29  28  27  26  25  24  23  22  21  20  19  18  17  16  15  14  13  12  11  10  09  08  07  06  05  04  03  02  01  00
-    // 6502:  IRQ XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX RST NMI R/W SYN PHI2 XXX XXX XXX XXX
-    // 6809:  IRQ XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX RST NMI R/W Q   E    XXX XXX XXX XXX
-    // Z80:   RD  XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX IORQ WR MREQ M1 CLK  XXX XXX XXX XXX
-    // 6800:  IRQ XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX XXX RST NMI R/W VMA PHI2 XXX XXX XXX XXX
-
-    cTriggerBits = triggerLevel ? 0b00000000000000000000000100000000 : 0;
-    cTriggerMask = 0b00000000000000000000000100000000;
-    aTriggerBits = 0;
-    aTriggerMask = 0;
-    dTriggerBits = 0;
-    dTriggerMask = 0;
+    if (cpu != cpu_z80) {
+      // 6502, 6800, 6809 -- all 6800-like
+      which_c_trigger = CC_6800_RESET;
+    } else {
+      which_c_trigger = CC_Z80_RESET;
+    }
   } else if (triggerMode == tr_irq) {
-    cTriggerBits = triggerLevel ? 0b10000000000000000000000000000000 : 0;
-    cTriggerMask = 0b10000000000000000000000000000000;
-    aTriggerBits = 0;
-    aTriggerMask = 0;
-    dTriggerBits = 0;
-    dTriggerMask = 0;
+    if (cpu != cpu_z80) {
+      // 6502, 6800, 6809 -- all 6800-like
+      which_c_trigger = CC_6800_IRQ;
+    } else {
+      which_c_trigger = CC_Z80_INT;
+    }
   } else if (triggerMode == tr_nmi) {
-    cTriggerBits = triggerLevel ? 0b00000000000000000000000010000000 : 0;
-    cTriggerMask = 0b00000000000000000000000010000000;
-    aTriggerBits = 0;
-    aTriggerMask = 0;
-    dTriggerBits = 0;
-    dTriggerMask = 0;
-  } else if (triggerMode == tr_spare1) {
-    aTriggerBits = triggerLevel ? 0b00010000000000000000000000000000 : 0;
-    aTriggerMask = 0b00010000000000000000000000000000;
-    cTriggerBits = 0;
-    cTriggerMask = 0;
-    dTriggerBits = 0;
-    dTriggerMask = 0;
-  } else if (triggerMode == tr_spare2) {
-    dTriggerBits = triggerLevel ? 0b00000000000000000000001000000000 : 0;
-    dTriggerMask = 0b00000000000000000000001000000000;
-    aTriggerBits = 0;
-    aTriggerMask = 0;
-    dTriggerBits = 0;
-    dTriggerMask = 0;
-  } else if (triggerMode == tr_none) {
-    aTriggerBits = 0;
-    aTriggerMask = 0;
-    dTriggerBits = 0;
-    dTriggerMask = 0;
-    cTriggerBits = 0;
-    cTriggerMask = 0;
+    if (cpu != cpu_z80) {
+      // 6502, 6800, 6809 -- all 6800-like
+      which_c_trigger = CC_6800_NMI;
+    } else {
+      // which_c_trigger = CC_Z80_NMI;
+    }
+  }
+  // If a control signal trigger was specified, encode it.
+  if (which_c_trigger) {
+    cTriggerMask = scramble_CCxx(which_c_trigger, &aTriggerMask, &dTriggerMask);
+    if (triggerLevel) {
+      cTriggerBits = scramble_CCxx(which_c_trigger, &aTriggerBits, &dTriggerBits);
+    }
   }
 
   Serial.println("Waiting for trigger...");
@@ -1029,55 +1261,6 @@ void go()
   Serial.println(" samples).");
   unscramble();
 }
-
-
-// Rearrange sampled bits of data in buffer back into address, data,
-// and control lines.
-void unscramble()
-{
-  // Control lines
-  for (int i = 0; i < samples; i++) {
-    control[i] =
-      ((control[i] & CORE_PIN33_BITMASK)   ? 0x01 : 0) // /NMI /WR (Z80)
-      + ((control[i] & CORE_PIN29_BITMASK) ? 0x02 : 0) // /IRQ /RD (Z80)
-      + ((control[i] & CORE_PIN5_BITMASK)  ? 0x04 : 0) // /RESET /IORQ (Z80)
-      + ((control[i] & CORE_PIN4_BITMASK)  ? 0x08 : 0) // R/W /MREQ (Z80)
-      + ((control[i] & CORE_PIN3_BITMASK)  ? 0x10 : 0) // SYNC (6502) Q (6809) /M1 (Z80) VMA (6800)
-      + ((address[i] & CORE_PIN38_BITMASK) ? 0x20 : 0) // SPARE1 /RESET (Z80)
-      + ((data[i]    & CORE_PIN34_BITMASK) ? 0x40 : 0); // SPARE2 /INT (Z80)
-
-    // A15...A0
-    address[i] =
-      ((address[i] & CORE_PIN0_BITMASK)    ? 0x0001 : 0) // A0
-      + ((address[i] & CORE_PIN1_BITMASK)  ? 0x0002 : 0) // A1
-      + ((address[i] & CORE_PIN14_BITMASK) ? 0x0004 : 0) // A2
-      + ((address[i] & CORE_PIN15_BITMASK) ? 0x0008 : 0) // A3
-      + ((address[i] & CORE_PIN16_BITMASK) ? 0x0010 : 0) // A4
-      + ((address[i] & CORE_PIN17_BITMASK) ? 0x0020 : 0) // A5
-      + ((address[i] & CORE_PIN18_BITMASK) ? 0x0040 : 0) // A6
-      + ((address[i] & CORE_PIN19_BITMASK) ? 0x0080 : 0) // A7
-      + ((address[i] & CORE_PIN20_BITMASK) ? 0x0100 : 0) // A8
-      + ((address[i] & CORE_PIN21_BITMASK) ? 0x0200 : 0) // A9
-      + ((address[i] & CORE_PIN22_BITMASK) ? 0x0400 : 0) // A10
-      + ((address[i] & CORE_PIN23_BITMASK) ? 0x0800 : 0) // A11
-      + ((address[i] & CORE_PIN24_BITMASK) ? 0x1000 : 0) // A12
-      + ((address[i] & CORE_PIN25_BITMASK) ? 0x2000 : 0) // A13
-      + ((address[i] & CORE_PIN26_BITMASK) ? 0x4000 : 0) // A14
-      + ((address[i] & CORE_PIN27_BITMASK) ? 0x8000 : 0); // A15
-
-    // D7...D0
-    data[i] =
-      ((data[i] & CORE_PIN6_BITMASK)    ? 0x01 : 0) // D0
-      + ((data[i] & CORE_PIN7_BITMASK)  ? 0x02 : 0) // D1
-      + ((data[i] & CORE_PIN8_BITMASK)  ? 0x04 : 0) // D2
-      + ((data[i] & CORE_PIN9_BITMASK)  ? 0x08 : 0) // D3
-      + ((data[i] & CORE_PIN10_BITMASK) ? 0x10 : 0) // D4
-      + ((data[i] & CORE_PIN11_BITMASK) ? 0x20 : 0) // D5
-      + ((data[i] & CORE_PIN12_BITMASK) ? 0x40 : 0) // D6
-      + ((data[i] & CORE_PIN32_BITMASK) ? 0x80 : 0); // D7
-  }
-}
-
 
 void loop() {
   String cmd;
@@ -1180,18 +1363,6 @@ void loop() {
       triggerLevel = false;
     } else if (cmd == "t nmi 1") {
       triggerMode = tr_nmi;
-      triggerLevel = true;
-    } else if ((cpu != cpu_z80) && (cmd == "t spare1 0")) {
-      triggerMode = tr_spare1;
-      triggerLevel = false;
-    } else if ((cpu != cpu_z80) && (cmd == "t spare1 1")) {
-      triggerMode = tr_spare1;
-      triggerLevel = true;
-    } else if ((cpu != cpu_z80) && (cmd == "t spare2 0")) {
-      triggerMode = tr_spare2;
-      triggerLevel = false;
-    } else if ((cpu != cpu_z80) && (cmd == "t spare2 1")) {
-      triggerMode = tr_spare2;
       triggerLevel = true;
     } else if (cmd.startsWith("t a ")) {
       int n = strtol(cmd.substring(4, 8).c_str(), NULL, 16);
