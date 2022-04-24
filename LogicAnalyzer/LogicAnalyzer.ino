@@ -292,6 +292,14 @@ const char *opcodes_6809[256] = {
 // 39 (1.29) - CC11
 // 40 (1.20) - CC12
 // 41 (1.21) - CC13
+//
+// Note that we snoop a total of 38 signals:
+// - 16 address signals
+// - 8 data signals
+// - 14 control signals
+//
+// This is exactly enough in order to fully probe any 40-pin 8-bit CPU
+// (2 pins will always be taken up by Vcc and GND).
 
 #define DBUS_DIR_PIN      30
 #define BUTTON_PIN        31
