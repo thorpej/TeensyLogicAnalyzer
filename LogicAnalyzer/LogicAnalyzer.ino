@@ -427,6 +427,11 @@ const char *opcodes_6809[256] = {
 #define CC_Z80_RESET      CC6_BITMASK
 #define CC_Z80_INT        CC7_BITMASK
 #define CC_Z80_NMI        CC8_BITMASK
+#define CC_Z80_BUSACK     CC9_BITMASK
+#define CC_Z80_BUSRQ      CC10_BITMASK
+#define CC_Z80_WAIT       CC11_BITMASK
+#define CC_Z80_HALT       CC12_BITMASK
+#define CC_Z80_RFSH       CC13_BITMASK
 
 #define CC_Z80_CLK_PIN    CC0_PIN
 
