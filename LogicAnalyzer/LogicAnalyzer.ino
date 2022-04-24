@@ -14,6 +14,7 @@
   - Add support for Z80 control line triggers.
   - Add support for Z80 I/O read or write trigger.
   - Better 6809 disassembly.
+  - Make use of all of the control signals snooped by the analyzer board.
 
   Licensed under the Apache License, Version 2.0 (the "License");
   you may not use this file except in compliance with the License.
