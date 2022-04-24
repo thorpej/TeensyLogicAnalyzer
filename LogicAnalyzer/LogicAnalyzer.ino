@@ -391,7 +391,10 @@ const char *opcodes_6809[256] = {
 #define CC_6502_IRQ       CC4_BITMASK
 #define CC_6502_NMI       CC5_BITMASK
 #define CC_6502_RDY       CC6_BITMASK
+#define CC_6502_SO        CC7_BITMASK
+#define CC_6502_PHI1      CC11_BITMASK
 
+#define CC_6502_PHI1_PIN  CC11_PIN
 #define CC_6502_PHI2_PIN  CC0_PIN
 
 #define CC_6800_PHI2      CC0_BITMASK         // same as 6502
@@ -404,7 +407,9 @@ const char *opcodes_6809[256] = {
 #define CC_6800_DBE       CC7_BITMASK
 #define CC_6800_BA        CC8_BITMASK
 #define CC_6800_TSC       CC10_BITMASK
+#define CC_6800_PHI1      CC11_BITMASK
 
+#define CC_6800_PHI1_PIN  CC11_PIN
 #define CC_6800_PHI2_PIN  CC0_PIN
 
 #define CC_6809_E         CC0_BITMASK
