@@ -278,7 +278,7 @@ const char *opcodes_6809[256] = {
 // 25 (1.13) - CA13
 // 26 (1.30) - CA14
 // 27 (1.31) - CA15
-// 28 (3.18)
+// 28 -- data bus enable
 // 29 (4.31) - CC4
 // 30 -- data bus direction
 // 31 -- trigger button
@@ -301,6 +301,7 @@ const char *opcodes_6809[256] = {
 // This is exactly enough in order to fully probe any 40-pin 8-bit CPU
 // (2 pins will always be taken up by Vcc and GND).
 
+#define ENABLE_PIN        28
 #define DBUS_DIR_PIN      30
 #define BUTTON_PIN        31
 
@@ -601,22 +602,43 @@ unscramble(void)
 }
 
 // Startup function
-void setup() {
-
-  // Enable pullups so unused pins go to a known (high) level.
+void
+setup(void)
+{
+  // Configure all of the pins.  We use all of the digital I/O
+  // pins vailable on the Teensy 4.1 board.
   for (int i = 0; i <= 41; i++) {
-    pinMode(i, INPUT_PULLUP);
-  }
+    switch (i) {
+      case CORE_LED0_PIN:
+        // LED pin is push-pull ouput.  This is used to indicate
+        // that we're waiting to trigger.
+        pinMode(CORE_LED0_PIN, OUTPUT);
+        break;
 
-  // Will use on-board LED to indicate triggering.
-  pinMode(CORE_LED0_PIN, OUTPUT);
+      case ENABLE_PIN:
+        // ENABLE pin is an open-drain output (there is a pull-up
+        // resistor connected to the /CE inputs of the '245s).
+        pinMode(ENABLE_PIN, OUTPUT_OPENDRAIN);
+        digitalWriteFast(ENABLE_PIN, HIGH);
+        break;
+
+      case DBUS_DIR_PIN:
+        // Direction pin controls the A-->B input on the '245s
+        // The Teensy is on the A side, so bring it low.
+        pinMode(DBUS_DIR_PIN, OUTPUT);
+        digitalWriteFast(DBUS_DIR_PIN, LOW);
+        break;
+
+      default:
+        // Every other pin is configured as an input with
+        // a pull-up.
+        pinMode(i, INPUT_PULLUP);
+        break;
+    }
+  }
 
   // Manual trigger button - low on this pin forces a trigger.
   attachInterrupt(digitalPinToInterrupt(BUTTON_PIN), triggerButton, FALLING);
-
-  // Data bus direction - output low to default to reading data bus.
-  pinMode(DBUS_DIR_PIN, OUTPUT);
-  digitalWriteFast(DBUS_DIR_PIN, LOW);
 
   Serial.begin(115200);
   while (!Serial) {
@@ -631,14 +653,15 @@ void setup() {
 
 
 // Interrupt handler for trigger button.
-void triggerButton()
+void
+triggerButton(void)
 {
   triggerPressed = true;
 }
 
-
 // Display settings and help info.
-void help()
+void
+help(void)
 {
   Serial.println(versionString);
   Serial.println(origVersionString);
@@ -772,7 +795,8 @@ void help()
 
 
 // List recorded data from start to end.
-void list(Stream &stream, int start, int end)
+void
+list(Stream &stream, int start, int end)
 {
   char output[50]; // Holds output string
 
@@ -1023,7 +1047,8 @@ void list(Stream &stream, int start, int end)
 
 
 // Show the recorded data in CSV format (e.g. to export to spreadsheet or other program).
-void exportCSV(Stream &stream)
+void
+exportCSV(Stream &stream)
 {
   bool sync;
   bool rw = false;
@@ -1179,7 +1204,8 @@ void exportCSV(Stream &stream)
 
 
 // Write the recorded data to files on the internal SD card slot.
-void writeSD()
+void
+writeSD(void)
 {
   const char *CSV_FILE = "analyzer.csv";
   const char *TXT_FILE = "analyzer.txt";
@@ -1224,7 +1250,8 @@ void writeSD()
 
 
 // Start recording.
-void go()
+void
+go(void)
 {
   aTriggerBits = 0;
   aTriggerMask = 0;
@@ -1386,7 +1413,8 @@ void go()
   unscramble();
 }
 
-void loop() {
+void
+loop(void) {
   String cmd;
 
   while (true) {
