@@ -601,6 +601,12 @@ unscramble(void)
    }
 }
 
+void
+setBusEnabled(bool e)
+{
+  digitalWriteFast(ENABLE_PIN, e ? LOW : HIGH);
+}
+
 // Startup function
 void
 setup(void)
@@ -619,7 +625,7 @@ setup(void)
         // ENABLE pin is an open-drain output (there is a pull-up
         // resistor connected to the /CE inputs of the '245s).
         pinMode(ENABLE_PIN, OUTPUT_OPENDRAIN);
-        digitalWriteFast(ENABLE_PIN, HIGH);
+        setBusEnabled(false);
         break;
 
       case DBUS_DIR_PIN:
@@ -1334,6 +1340,7 @@ go(void)
 
   triggerPressed = false; // Status of trigger button
 
+  setBusEnabled(true);
   digitalWriteFast(CORE_LED0_PIN, HIGH); // Indicates waiting for trigger
 
   int i = 0; // Index into data buffers
@@ -1406,6 +1413,8 @@ go(void)
 
     i = (i + 1) % samples; // Increment index, wrapping around at end for circular buffer
   }
+
+  setBusEnabled(false);
 
   Serial.print("Data recorded (");
   Serial.print(samples);
