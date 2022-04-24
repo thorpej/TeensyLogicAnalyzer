@@ -353,6 +353,12 @@ const char *opcodes_6809[256] = {
 #define CC12_PIN_BITMASK  CORE_PIN40_BITMASK  // in CAxx_PSR
 #define CC13_PIN_BITMASK  CORE_PIN41_BITMASK  // in CAxx_PSR
 
+// The control signals in CDxx_PSR need to be read at the same time as the
+// other control signals, which means we need to read the CDxx_PSR twice
+// and properly mix the bits from the each read into the final result.
+#define CDxx_PSR_CC_MASK  (CC7_PIN_BITMASK | CC8_PIN_BITMASK | CC9_PIN_BITMASK | CC10_PIN_BITMASK)
+#define CDxx_PSR_CD_MASK  (~CDxx_PSR_CC_MASK)
+
 // We need to poll certain CC pins, so define constants for
 // them here.
 #define CC0_PIN           2
@@ -1267,6 +1273,7 @@ go(void)
   cTriggerMask = 0;
 
   uint32_t which_c_trigger = 0;
+  uint32_t cd_psr_cc_bits;
   
   // Scramble the trigger address, control, and data lines to match what we will read on the ports.
   if (triggerMode == tr_address) {
@@ -1365,9 +1372,11 @@ go(void)
       WAIT_CLK_LOW;
     }
 
-    // Read address and control lines
+    // Read address and control lines.  Note that some of the control
+    // lines are in the CDxx_PSR, and we need to extract those as well.
     control[i] = CCxx_PSR;
     address[i] = CAxx_PSR;
+    cd_psr_cc_bits = CDxx_PSR & CDxx_PSR_CC_MASK;
 
     if ((cpu == cpu_65c02) || (cpu == cpu_6502) || (cpu == cpu_6800)) {
       // Wait for PHI2 to go from high to low
@@ -1385,8 +1394,9 @@ go(void)
       WAIT_CLK_HIGH;
     }
 
-    // Read data lines
-    data[i] = CDxx_PSR;
+    // Read data lines.  Mask out the control bits on this
+    // read and mix in the control bits read above.
+    data[i] = (CDxx_PSR & CDxx_PSR_CD_MASK) | cd_psr_cc_bits;
 
     // Set triggered flag if trigger button pressed or trigger seen
     // If triggered, increment buffer index
