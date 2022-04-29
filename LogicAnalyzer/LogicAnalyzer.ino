@@ -278,10 +278,10 @@ const char *opcodes_6809[256] = {
 // 25 (1.13) - CA13
 // 26 (1.30) - CA14
 // 27 (1.31) - CA15
-// 28 -- data bus enable
+// 28 (3.18) -- data bus enable
 // 29 (4.31) - CC4
-// 30 -- data bus direction
-// 31 -- trigger button
+// 30 (3.23) - n/c
+// 31 (3.22) -- trigger button
 // 32 (2.12) - CD7
 // 33 (4.7)  - CC5
 // 34 (2.29) - CC7
@@ -302,7 +302,6 @@ const char *opcodes_6809[256] = {
 // (2 pins will always be taken up by Vcc and GND).
 
 #define ENABLE_PIN        28
-#define DBUS_DIR_PIN      30
 #define BUTTON_PIN        31
 
 #define CAxx_PSR          CORE_PIN0_PINREG   // All CAxx lines are in the same GPIO port
@@ -487,7 +486,7 @@ scramble_CAxx(uint32_t ca)
          ((ca & (1U << 15)) ? CA15_PIN_BITMASK : 0);
 }
 
-int32_t
+uint32_t
 unscramble_CAxx(uint32_t reg)
 {
   return ((reg &  CA0_PIN_BITMASK) ? (1U <<  0) : 0) |
@@ -632,13 +631,6 @@ setup(void)
         // resistor connected to the /CE inputs of the '245s).
         pinMode(ENABLE_PIN, OUTPUT_OPENDRAIN);
         setBusEnabled(false);
-        break;
-
-      case DBUS_DIR_PIN:
-        // Direction pin controls the A-->B input on the '245s
-        // The Teensy is on the A side, so bring it low.
-        pinMode(DBUS_DIR_PIN, OUTPUT);
-        digitalWriteFast(DBUS_DIR_PIN, LOW);
         break;
 
       default:
