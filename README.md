@@ -17,7 +17,9 @@ Individual adapter modules mate the analyzer to a specific CPU.  These adapter m
 a 40-pin keyed IDC header, as well as 2 (optionally 3) rows of 1x20 pin headers for connecting a 40-pin
 DIP clip to the adapter.  The adapter maps the target CPU's pin configuration to the analyzer's input
 pins.  In addition to providing future expandability, it also keeps the manufacturing cost of the boards
-low (some PCB fabricators charge as little as $5 for a run of 10 if the board is smaller than 100mm x 100mm).
+low (some PCB fabricators charge as little as $5 + shipping for a run of 10 if the board is smaller
+than 100mm x 100mm).  The analyzer board is approximately 91mm x 91mm (roughly 3.5 inches square), and
+uses all through-hole components to make it easy to build.
 
 In addition, I plan to make some specific enhancements to the 6809 support, including:
 - Support additional signals on the 6809 (e.g. BS, BA, /FIRQ, /HALT).
