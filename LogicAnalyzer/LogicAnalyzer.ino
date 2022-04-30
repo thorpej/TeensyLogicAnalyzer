@@ -628,15 +628,15 @@ setup(void)
 
       case ENABLE_PIN:
         // ENABLE pin is an open-drain output (there is a pull-up
-        // resistor connected to the /CE inputs of the '245s).
+        // resistor connected to the /CE inputs of the 74LVC245s).
         pinMode(ENABLE_PIN, OUTPUT_OPENDRAIN);
         setBusEnabled(false);
         break;
 
       default:
-        // Every other pin is configured as an input with
-        // a pull-up.
-        pinMode(i, INPUT_PULLUP);
+        // Every other pin is configured as an input.  *No* pull-up;
+        // the 74LVC245 has push-pull outputs.
+        pinMode(i, INPUT);
         break;
     }
   }
