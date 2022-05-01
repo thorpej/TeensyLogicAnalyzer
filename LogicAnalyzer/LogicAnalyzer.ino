@@ -210,39 +210,65 @@ const char *opcodes_6800[256] = {
 };
 
 // Instructions for 6809 disassembler.
+//
+// Addressing modes:
+//
+// <$dd           direct (1 post-byte)
+// $eeee          extended (2 post-byte)
+// $rr            relative (1 post-byte)
+// $rrrr          relative (2 post-bytes)
+// #$II           immediate (1 post-byte)
+// #$IIII         immediate (2 post-bytes)
+// iiiiiiiiiii    indexed (1-3 post-bytes) -- longest form is [$hhhh,PCR]
 const char *opcodes_6809[256] = {
-  "NEG", "?", "?", "COMB", "LSR", "?", "ROR", "ASR",
-  "ASL", "ROL", "DEC", "?", "INC", "TST", "JMP", "CLR",
-  "(extended)", "(extended)", "NOP", "SYNC", "?", "?", "LBRA", "LBSR",
-  "?", "DAA", "ORCC", "?", "ANDCC", "SEX", "EXG", "TFR",
-  "BRA", "BRN", "BHI", "BLS", "BCC", "BCS", "BNE", "BEQ",
-  "BVC", "BVS", "BPL", "BMI", "BGE", "BLT", "BGT", "BLE",
-  "LEAX", "LEAY", "LEAS", "LEAU", "PSHS", "PULS", "PSHU", "PULU",
+  "NEG <$dd", "?", "?", "COM <$dd", "LSR <$dd", "?", "ROR <$dd", "ASR <$dd",
+  "ASL <$dd", "ROL <$dd", "DEC <$dd", "?", "INC <$dd", "TST <$dd", "JMP <$dd", "CLR <$dd",
+
+  "(extended)", "(extended)", "NOP", "SYNC", "?", "?", "LBRA $rrrr", "LBSR $rrrr",
+                                                   // XXX decode regs for EXG and TFR
+  "?", "DAA", "ORCC #$II", "?", "ANDCC #$II", "SEX", "EXG #$II", "TFR #$II",
+
+  "BRA $rr", "BRN $rr", "BHI $rr", "BLS $rr", "BCC $rr", "BCS $rr", "BNE $rr", "BEQ $rr",
+  "BVC $rr", "BVS $rr", "BPL $rr", "BMI $rr", "BGE $rr", "BLT $rr", "BGT $rr", "BLE $rr",
+                                                                               // XXX decode regs for PSH / PUL
+  "LEAX iiiiiiiiiii", "LEAY iiiiiiiiiii", "LEAS iiiiiiiiiii", "LEAU iiiiiiiiiii", "PSHS #$II", "PULS #$II", "PSHU #$II", "PULU #$II",
   "?", "RTS", "ABX", "RTI", "CWAI", "MUL", "?", "SWI",
+  
   "NEGA", "?", "?", "COMA", "LSRA", "?", "RORA", "ASRA",
   "ASLA", "ROLA", "DECA", "?", "INCA", "TSTA", "?", "CLRA",
+  
   "NEGB", "?", "?", "COMB", "LSRB", "?", "RORB", "ASRB",
   "ASLB", "ROLB", "DECB", "?", "INCB", "TSTB", "?", "CLRB",
-  "NEG", "?", "?", "COMB", "LSR", "?", "ROR", "ASR",
-  "ASL", "ROL", "DEC", "?", "INC", "TST", "JMP", "CLR",
-  "NEG", "?", "?", "COMB", "LSR", "?", "ROR", "ASR",
-  "ASL", "ROL", "DEC", "?", "INC", "TST", "JMP", "CLR",
-  "SUBA", "CMPA", "SBCA", "SUBD", "ANDA", "BITA", "LDA", "?",
-  "EORA", "ADCA", "ORA", "ADDA", "CMPX", "BSR", "LDX", "?",
-  "SUBA", "CMPA", "SBCA", "SUBD", "ANDA", "BITA", "LDA", "STA",
-  "EORA", "ADCA", "ORA", "ADDA", "CMPX", "JSR", "LDX", "STX",
-  "SUBA", "CMPA", "SBCA", "SUBD", "ANDA", "BITA", "LDA", "STA",
-  "EORA", "ADCA", "ORA", "ADDA", "CMPX", "JSR", "LDX", "STX",
-  "SUBA", "CMPA", "SBCA", "SUBD", "ANDA", "BITA", "LDA", "STA",
-  "EORA", "ADCA", "ORA", "ADDA", "CMPX", "JSR", "LDX", "STX",
-  "SUBB", "CMPB", "SBCB", "ADDD", "ANDB", "BITB", "LDB", "?",
-  "EORB", "ADCB", "ORB", "ADDB", "LDD", "?", "LDU", "?",
-  "SUBB", "CMPB", "SBCB", "ADDD", "ANDB", "BITB", "LDB", "STB",
-  "EORB", "ADCB", "ORB", "ADDB", "LDD", "STD", "LDU", "STU",
-  "SUBB", "CMPB", "SBCB", "ADDD", "ANDB", "BITB", "LDB", "STB",
-  "EORB", "ADCB", "ORB", "ADDB", "LDD", "STD", "LDU", "STU",
-  "SUBB", "CMPB", "SBCB", "ADDD", "ANDB", "BITB", "LDB", "STB",
-  "EORB", "ADCB", "ORB", "ADDB", "LDD", "STD", "LDU", "STU"
+  
+  "NEG iiiiiiiiiii", "?", "?", "COM iiiiiiiiiii", "LSR iiiiiiiiiii", "?", "ROR iiiiiiiiiii", "ASR iiiiiiiiiii",
+  "ASL iiiiiiiiiii", "ROL iiiiiiiiiii", "DEC iiiiiiiiiii", "?", "INC iiiiiiiiiii", "TST iiiiiiiiiii", "JMP iiiiiiiiiii", "CLR iiiiiiiiiii",
+  
+  "NEG $eeee", "?", "?", "COM $eeee", "LSR $eeee", "?", "ROR $eeee", "ASR $eeee",
+  "ASL $eeee", "ROL $eeee", "DEC $eeee", "?", "INC $eeee", "TST $eeee", "JMP $eeee", "CLR $eeee",
+  
+  "SUBA #$II", "CMPA #$II", "SBCA #$II", "SUBD #$IIII", "ANDA #$II", "BITA #$II", "LDA #$II", "?",
+  "EORA #$II", "ADCA #$II", "ORA #$II", "ADDA #$II", "CMPX #$IIII", "BSR $rr", "LDX #$IIII", "?",
+  
+  "SUBA <$dd", "CMPA <$dd", "SBCA <$dd", "SUBD <$dd", "ANDA <$dd", "BITA <$dd", "LDA <$dd", "STA <$dd",
+  "EORA <$dd", "ADCA <$dd", "ORA <$dd", "ADDA <$dd", "CMPX <$dd", "JSR <$dd", "LDX <$dd", "STX <$dd",
+  
+  "SUBA iiiiiiiiiii", "CMPA iiiiiiiiiii", "SBCA iiiiiiiiiii", "SUBD iiiiiiiiiii", "ANDA iiiiiiiiiii", "BITA iiiiiiiiiii", "LDA iiiiiiiiiii", "STA iiiiiiiiiii",
+  "EORA iiiiiiiiiii", "ADCA iiiiiiiiiii", "ORA iiiiiiiiiii", "ADDA iiiiiiiiiii", "CMPX iiiiiiiiiii", "JSR iiiiiiiiiii", "LDX iiiiiiiiiii", "STX iiiiiiiiiii",
+  
+  "SUBA $eeee", "CMPA $eeee", "SBCA $eeee", "SUBD $eeee", "ANDA $eeee", "BITA $eeee", "LDA $eeee", "STA $eeee",
+  "EORA $eeee", "ADCA $eeee", "ORA $eeee", "ADDA $eeee", "CMPX $eeee", "JSR $eeee", "LDX $eeee", "STX $eeee",
+  
+  "SUBB #$II", "CMPB #$II", "SBCB #$II", "ADDD #$II", "ANDB #$II", "BITB #$II", "LDB #$II", "?",
+  "EORB #$II", "ADCB #$II", "ORB #$II", "ADDB #$II", "LDD #$IIII", "?", "LDU #$IIII", "?",
+  
+  "SUBB <$dd", "CMPB <$dd", "SBCB <$dd", "ADDD <$dd", "ANDB <$dd", "BITB <$dd", "LDB <$dd", "STB <$dd",
+  "EORB <$dd", "ADCB <$dd", "ORB <$dd", "ADDB <$dd", "LDD <$dd", "STD <$dd", "LDU <$dd", "STU <$dd",
+  
+  "SUBB iiiiiiiiiii", "CMPB iiiiiiiiiii", "SBCB iiiiiiiiiii", "ADDD iiiiiiiiiii", "ANDB iiiiiiiiiii", "BITB iiiiiiiiiii", "LDB iiiiiiiiiii", "STB iiiiiiiiiii",
+  "EORB iiiiiiiiiii", "ADCB iiiiiiiiiii", "ORB iiiiiiiiiii", "ADDB iiiiiiiiiii", "LDD iiiiiiiiiii", "STD iiiiiiiiiii", "LDU iiiiiiiiiii", "STU iiiiiiiiiii",
+  
+  "SUBB $eeee", "CMPB $eeee", "SBCB $eeee", "ADDD $eeee", "ANDB $eeee", "BITB $eeee", "LDB $eeee", "STB $eeee",
+  "EORB $eeee", "ADCB $eeee", "ORB $eeee", "ADDB $eeee", "LDD $eeee", "STD $eeee", "LDU $eeee", "STU $eeee"
 };
 
 //
@@ -796,7 +822,6 @@ help(void)
   Serial.println("w                    - Write data to SD card");
   Serial.println("h or ?               - Show command usage");
 }
-
 
 // List recorded data from start to end.
 void
