@@ -632,6 +632,46 @@ unscramble(void)
    }
 }
 
+//
+// Disassembler support.
+//
+#define INSN_BUFSIZE  32              // Space for formatted instruction
+
+const char *
+disas_6502(int i, char *buf)
+{
+  const char *opcode;
+
+  if (cpu == cpu_65c02) {
+    opcode = opcodes_65c02[data[i]];
+  } else {
+    opcode = opcodes_6502[data[i]];
+  }
+  String s = opcode;
+  // Fill in operands
+  if (s.indexOf("nnnn") != -1) { // absolute
+    char op[5];
+    sprintf(op, "$%04lX", data[i + 1] + 256 * data[i + 2]);
+    s.replace("nnnn", op);
+  }
+  if (s.indexOf("nn") != -1) { // page zero
+    char op[3];
+    sprintf(op, "$%02lX", data[i + 1]);
+    s.replace("nn", op);
+  }
+  if (s.indexOf("rr") != -1) { // relative branch
+    char op[3];
+    if (data[i + 1] < 0x80) {
+      sprintf(op, "$%04lX", address[i] + 2 + data[i + 1]);
+    } else {
+      sprintf(op, "$%04lX", address[i] + 2 - (256 - data[i + 1]));
+    }
+    s.replace("rr", op);
+  }
+  strcpy(buf, s.c_str());
+  return buf;
+}
+
 void
 setBusEnabled(bool e)
 {
@@ -827,7 +867,8 @@ help(void)
 void
 list(Stream &stream, int start, int end)
 {
-  char output[50]; // Holds output string
+  char insnbuf[INSN_BUFSIZE];
+  char output[80];
 
   int first = (triggerPoint - pretrigger + samples) % samples;
   int last = (triggerPoint - pretrigger + samples - 1) % samples;
@@ -852,40 +893,11 @@ list(Stream &stream, int start, int end)
       if ((cpu == cpu_65c02) || (cpu == cpu_6502)) {
         if  (control[i] & CC_6502_SYNC) {
           cycle = "F";
-          if (cpu == cpu_65c02) {
-            opcode = opcodes_65c02[data[i]];
-          } else {
-            opcode = opcodes_6502[data[i]];
-          }
-          String s = opcode;
-          // Fill in operands
-          if (s.indexOf("nnnn") != -1) { // absolute
-            char op[5];
-            sprintf(op, "$%04lX", data[i + 1] + 256 * data[i + 2]);
-            s.replace("nnnn", op);
-          }
-          if (s.indexOf("nn") != -1) { // page zero
-            char op[3];
-            sprintf(op, "$%02lX", data[i + 1]);
-            s.replace("nn", op);
-          }
-          if (s.indexOf("rr") != -1) { // relative branch
-            char op[3];
-            if (data[i + 1] < 0x80) {
-              sprintf(op, "$%04lX", address[i] + 2 + data[i + 1]);
-            } else {
-              sprintf(op, "$%04lX", address[i] + 2 - (256 - data[i + 1]));
-            }
-            s.replace("rr", op);
-          }
-          opcode = s.c_str();
-
+          opcode = disas_6502(i, insnbuf);
         } else if (control[i] & CC_6502_RW) {
           cycle = "R";
-          opcode = "";
         } else {
           cycle = "W";
-          opcode = "";
         }
       }
 
@@ -896,7 +908,6 @@ list(Stream &stream, int start, int end)
         if (address[i] == 0xffff &&
             (control[i] & (CC_6809_RW | CC_6809_BS)) == CC_6809_RW) {
           cycle = "-";
-          opcode = "";
         } else if (control[i] & CC_6809_RW) {
           // On 6809E, if we saw LIC on the previous cycle, then
           // this is an insn fetch.  We're just going to assume
@@ -907,15 +918,12 @@ list(Stream &stream, int start, int end)
             if (seen_lic || j == 0) {
               opcode = opcodes_6809[data[i]];
               seen_lic = false;
-            } else {
-              opcode = "";
             }
           } else {
             opcode = opcodes_6809[data[i]];
           }
         } else {
           cycle = "W";
-          opcode = "";
         }
         if (cpu == cpu_6809e && (control[i] & CC_6809E_LIC)) {
           seen_lic = true;
@@ -935,19 +943,14 @@ list(Stream &stream, int start, int end)
           opcode = opcodes_z80[data[i]];
         } else if (!(control[i] & CC_Z80_MREQ) && !(control[i] & CC_Z80_RD)) {
           cycle = "R";
-          opcode = "";
         } else if (!(control[i] & CC_Z80_MREQ) && !(control[i] & CC_Z80_WR)) {
           cycle = "W";
-          opcode = "";
         } else if (!(control[i] & CC_Z80_IORQ) && !(control[i] & CC_Z80_RD)) {
           cycle = "IR";
-          opcode = "";
         } else if (!(control[i] & CC_Z80_IORQ) && !(control[i] & CC_Z80_WR)) {
           cycle = "IW";
-          opcode = "";
         } else {
           cycle = " ";
-          opcode = "";
         }
       }
 
@@ -958,14 +961,12 @@ list(Stream &stream, int start, int end)
         //  1   1  Memory write
         if (!(control[i] & CC_6800_VMA)) {
           cycle = "-";
-          opcode = "";
         } else {
           if (control[i] & CC_6800_RW) {
             cycle = "R";
             opcode = opcodes_6800[data[i]];
           } else {
             cycle = "W";
-            opcode = "";
           }
         }
       }
