@@ -134,6 +134,7 @@ typedef enum { ds_idle, ds_fetching, ds_complete } decode_state_t;
 #define INSN_DECODE_MAXSTRING   20
 struct insn_decode {
   decode_state_t      state;
+  uint32_t            insn_address;
   void                (*next_state)(struct insn_decode *);
   int                 bytes_required;
   int                 bytes_fetched;
@@ -1437,10 +1438,11 @@ insn_decode_init(struct insn_decode *id)
 }
 
 void
-insn_decode_begin(struct insn_decode *id, uint8_t b)
+insn_decode_begin(struct insn_decode *id, uint32_t addr, uint8_t b)
 {
   if (id->next_state != NULL && id->state == ds_idle) {
     id->state = ds_fetching;
+    id->insn_address = addr;
     id->addrmode = am_invalid;
     id->bytes_required = 0;
     id->bytes_fetched = 0;
@@ -1505,7 +1507,7 @@ list(Stream &stream, int start, int end)
       // show as read or write.
       if ((cpu == cpu_65c02) || (cpu == cpu_6502)) {
         if (control[i] & CC_6502_SYNC) {
-          insn_decode_begin(&id, data[i]);
+          insn_decode_begin(&id, address[i], data[i]);
           cycle = "F";
         } else if (control[i] & CC_6502_RW) {
           insn_decode_continue(&id, data[i]);
@@ -1529,7 +1531,7 @@ list(Stream &stream, int start, int end)
           if (cpu == cpu_6809e) {
             if (seen_lic) {
               cycle = "F";
-              insn_decode_begin(&id, data[i]);
+              insn_decode_begin(&id, address[i], data[i]);
               seen_lic = false;
             } else {
               insn_decode_continue(&id, data[i]);
@@ -1553,7 +1555,7 @@ list(Stream &stream, int start, int end)
 
         if (!(control[i] & CC_Z80_M1)) {
           cycle = "F";
-          insn_decode_begin(&id, data[i]);
+          insn_decode_begin(&id, address[i], data[i]);
         } else if (!(control[i] & CC_Z80_MREQ) && !(control[i] & CC_Z80_RD)) {
           cycle = "R";
           insn_decode_continue(&id, data[i]);
