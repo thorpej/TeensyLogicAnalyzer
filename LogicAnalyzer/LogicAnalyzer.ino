@@ -94,6 +94,30 @@ typedef enum {
   am6809_psh_pul          = 28,   // actually Immediate
 
   am6809_last             = 28,
+
+  //
+  // 6502 addressing modes.  Refer to Section 4 of the WDC 65C02 data sheet.
+  //
+  am6502_first            = 29,
+
+  am6502_abs,             = 29,   // Absolute a
+  am6502_abs_idx_ind,     = 30,   // Absolute Indexed Indirect (a,x)
+  am6502_abs_idx_x,       = 31,   // Absolute Indexed with X a,x
+  am6502_abs_idx_y,       = 32,   // Absolute Indexed with Y a,y
+  am6502_abs_ind,         = 33,   // Absolute Indirect (a)
+  am6502_acc_a            = 34,   // Accumulator A
+  am6502_imm,             = 35,   // Immediate Addressing #
+  am6502_implied,         = 36,   // Implied i
+  am6502_pcrel,           = 37,   // Program Counter Relative r
+  am6502_stack,           = 38,   // Stack s
+  am6502_zp,              = 39,   // Zero Page zp
+  am6502_zp_idx_ind,      = 40,   // Zero Page Indexed Indirect (zp,x)
+  am6502_zp_idx_x,        = 41,   // Zero Page Indexed with X zp,x
+  am6502_zp_idx_y,        = 42,   // Zero Page Indexed with Y zp,y
+  am6502_zp_ind,          = 43,   // Zero Page Indirect (zp)
+  am6502_zp_ind_idx_y,    = 44,   // Zero Page Indirect Indexed with Y (zp),y
+
+  am6502_last             = 44,
 } addrmode_t;
 
 #define am6809_indexed_p(am)  ((am) >= am6809_zero_off && (am) <= am6809_extended_ind)
