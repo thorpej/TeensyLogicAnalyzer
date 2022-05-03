@@ -44,6 +44,65 @@ typedef enum { tr_address, tr_io, tr_data, tr_reset, tr_irq, tr_firq, tr_nmi, tr
 typedef enum { tr_read, tr_write, tr_either } cycle_t;
 typedef enum { cpu_6502, cpu_65c02, cpu_6800, cpu_6809, cpu_6809e, cpu_z80 } cpu_t;
 
+// addressing mode types
+typedef enum {
+  // Unrecognized opcodes get this
+  am_invalid              = -1,
+
+  //
+  // 6809 addressing modes
+  // N.B. We have 8- and 16-bit versions of Immediate and Relative merely
+  // to account for the numnber of bytes following the opcode; the 6809
+  // data sheet makes no such distinction.  Ditto for the sized modes in
+  // the Indexed category.
+  //
+  am6809_first            = 0,
+
+  am6809_inherent         = 0,
+  am6809_direct           = 1,
+  am6809_extended         = 2,
+  am6809_rel8             = 3,
+  am6809_rel16            = 4,
+  am6809_imm8             = 5,
+  am6809_imm16            = 6,
+
+  // indexed addressing modes.  Keep indirect variants
+  // ordered immediately after their non-indirect
+  // counterparts; other code depends on this ordering.
+  am6809_zero_off         = 7,
+  am6809_zero_off_ind     = 8,
+  am6809_const_off5       = 9,
+  am6809_const_off8       = 10,
+  am6809_const_off8_ind   = 11,
+  am6809_const_off16      = 12,
+  am6809_const_off16_ind  = 13,
+  am6809_acc_off          = 14,
+  am6809_acc_off_ind      = 15,
+  am6809_post_inc1        = 16,
+  am6809_post_inc2        = 17,
+  am6809_post_inc2_ind    = 18,
+  am6809_pre_dec1         = 19,
+  am6809_pre_dec2         = 20,
+  am6809_pre_dec2_ind     = 21,
+  am6809_pcrel8           = 22,
+  am6809_pcrel8_ind       = 23,
+  am6809_pcrel16          = 24,
+  am6809_pcrel16_ind      = 25,
+  am6809_extended_ind     = 26,
+  // Pseudo-modes for special cases
+  am6809_exg_tfr          = 27,   // actually Immediate
+  am6809_psh_pul          = 28,   // actually Immediate
+
+  am6809_last             = 28,
+} addrmode_t;
+
+#define am6809_indexed_p(am)  ((am) >= am6809_zero_off && (am) <= am6809_extended_ind)
+#define am6809_indirect_p(am) ((am) == am6809_zero_off_ind || (am) == am6809_const_off8_ind || \
+                               (am) == am6809_const_off16_ind || (am) == am6809_acc_off_ind || \
+                               (am) == am6809_post_inc2_ind || (am) == am6809_pre_dec2_ind || \
+                               (am) == am6809_pcrel8_ind || (am) == am6809_pcrel16_ind || \
+                               (am) == am6809_extended_ind)
+
 // Global variables
 uint32_t control[BUFFSIZE];           // Recorded control line data
 uint32_t address[BUFFSIZE];           // Recorded address data
@@ -64,6 +123,26 @@ cycle_t triggerCycle = tr_either;     // Trigger on read, write, or either
 bool triggerLevel = false;            // Trigger level (false=low, true=high);
 volatile bool triggerPressed = false; // Set by hardware trigger button
 
+//
+// Instruction decoding.
+//
+// The decode buffer runs through a small state machine, gathering bytes until it
+// has a valid opcode that can be displayed.
+//
+typedef enum { ds_idle, ds_fetching, ds_complete } decode_state_t;
+#define INSN_DECODE_MAXBYTES    8
+#define INSN_DECODE_MAXSTRING   20
+struct insn_decode {
+  decode_state_t      state;
+  void                (*next_state)(struct insn_decode *);
+  int                 bytes_required;
+  int                 bytes_fetched;
+  addrmode_t          addrmode;
+  uint8_t             bytes[INSN_DECODE_MAXBYTES];
+  char                insn_string[INSN_DECODE_MAXSTRING];
+};
+
+#if 0
 // Instructions for 65C02 disassembler.
 const char *opcodes_65c02[256] = {
   "BRK", "ORA (nn,X)", "?", "?", "TSB nn", "ORA nn", "ASL nn", "RMB0 nn",
@@ -172,104 +251,590 @@ const char *opcodes_z80[256] = {
   "RET", "POP", "JP", "DI", "CALL", "PUSH", "OR", "RST",
   "RET", "LD", "JP", "EI", "CALL", "(extended)", "CP", "RST"
 };
+#endif
 
-// Instructions for 6800 disassembler.
-const char *opcodes_6800[256] = {
-  "?", "NOP", "?", "?", "?", "?", "TAP", "TPA",
-  "INX", "DEX", "CLV", "SEV", "CLC", "SEC", "CLI", "SEI",
-  "SBA", "CBA", "?", "?", "?", "?", "TAB", "TBA",
-  "?", "DAA", "?", "ABA", "?", "?", "?", "?",
-  "BRA", "?", "BHI", "BLS", "BCC", "BCS", "BNE", "BEQ",
-  "BVC", "BVS", "BPL", "BMI", "BGE", "BLT", "BGT", "BLE",
-  "TSX", "INS", "PULA", "PULB", "DES", "TXS", "PSHA", "PSHB",
-  "?", "RTS", "?", "RTI", "?", "?", "WAI", "SWI",
-  "NEGA", "?", "?", "COMA", "LSRA", "?", "RORA", "ASRA",
-  "ASLA", "ROLA", "DECA", "?", "INCA", "TSTA", "?", "CLRA",
-  "NEGB", "?", "?", "COMB", "LSRB", "?", "RORB", "ASRB",
-  "ASLB", "ROLB", "DECB", "?", "INCB", "TSTB", "?", "CLRB",
-  "NEG", "?", "?", "COM", "LSR", "?", "ROR", "ASR",
-  "ASL", "ROL", "DEC", "?", "INC", "TST", "JMP", "CLR",
-  "NEG", "?", "?", "COM", "LSR", "?", "ROR", "ASR",
-  "ASL", "ROL", "DEC", "?", "INC", "TST", "JMP", "CLR",
-  "SUBA", "CMPA", "SBCA", "?", "ANDA", "BITA", "LDAA", "?",
-  "EORA", "ADCA", "ORAA", "ADDA", "CPX", "BSR", "LDS", "?",
-  "SUBA", "CMPA", "SBCA", "?", "ANDA", "BITA", "LDAA", "STAA",
-  "EORA", "ADCA", "ORAA", "ADDA", "CPX", "?", "LDS", "STS",
-  "SUBA", "CMPA", "SBCA", "?", "ANDA", "BITA", "LDAA", "STAA",
-  "EORA", "ADCA", "ORAA", "ADDA", "CPX", "JSR", "LDS", "STS",
-  "SUBA", "CMPA", "SBCA", "?", "ANDA", "BITA", "LDAA", "STAA",
-  "EORA", "ADCA", "ORAA", "ADDA", "CPX", "JSR", "LDS", "STS",
-  "SUBB", "CMPB", "SBCB", "?", "ANDB", "BITB", "LDAB", "?",
-  "EORB", "ADCB", "ORAB", "ADDB", "?", "?", "LDX", "?",
-  "SUBB", "CMPB", "SBCB", "?", "ANDB", "BITB", "LDAB", "STAB",
-  "EORB", "ADCB", "ORAB", "ADDB", "?", "?", "LDX", "STX",
-  "SUBB", "CMPB", "SBCB", "?", "ANDB", "BITB", "LDAB", "STAB",
-  "EORB", "ADCB", "ORAB", "ADDB", "?", "?", "LDX", "STX",
-  "SUBB", "CMPB", "SBCB", "?", "ANDB", "BITB", "LDAB", "STAB",
-  "EORB", "ADCB", "ORAB", "ADDB", "?", "?", "LDX", "STX"
+//
+// 6809 instruction decoding
+//
+
+#define POSTBYTES(am, n) [(am) - am6809_first] = (n)
+
+const uint8_t
+insn_postbytes_6809[] = {
+  POSTBYTES(am6809_inherent,        0),
+  POSTBYTES(am6809_direct,          1),
+  POSTBYTES(am6809_extended,        2),
+  POSTBYTES(am6809_rel8,            1),
+  POSTBYTES(am6809_rel16,           2),
+  POSTBYTES(am6809_imm8,            1),
+  POSTBYTES(am6809_imm16,           2),
+  POSTBYTES(am6809_zero_off,        1),
+  POSTBYTES(am6809_zero_off_ind,    1),
+  POSTBYTES(am6809_const_off5,      1),
+  POSTBYTES(am6809_const_off8,      2),
+  POSTBYTES(am6809_const_off8_ind,  2),
+  POSTBYTES(am6809_const_off16,     3),
+  POSTBYTES(am6809_const_off16_ind, 3),
+  POSTBYTES(am6809_acc_off,         1),
+  POSTBYTES(am6809_acc_off_ind,     1),
+  POSTBYTES(am6809_post_inc1,       1),
+  POSTBYTES(am6809_post_inc2,       1),
+  POSTBYTES(am6809_post_inc2_ind,   1),
+  POSTBYTES(am6809_pre_dec1,        1),
+  POSTBYTES(am6809_pre_dec2,        1),
+  POSTBYTES(am6809_pre_dec2_ind,    1),
+  POSTBYTES(am6809_pcrel8,          2),
+  POSTBYTES(am6809_pcrel8_ind,      2),
+  POSTBYTES(am6809_pcrel16,         3),
+  POSTBYTES(am6809_pcrel16_ind,     3),
+  POSTBYTES(am6809_extended_ind,    3),
+  POSTBYTES(am6809_exg_tfr,         1),
+  POSTBYTES(am6809_psh_pul,         1),
 };
 
-// Instructions for 6809 disassembler.
-//
-// Addressing modes:
-//
-// <$dd           direct (1 post-byte)
-// $eeee          extended (2 post-byte)
-// $rr            relative (1 post-byte)
-// $rrrr          relative (2 post-bytes)
-// #$II           immediate (1 post-byte)
-// #$IIII         immediate (2 post-bytes)
-// iiiiiiiiiii    indexed (1-3 post-bytes) -- longest form is [$hhhh,PCR]
+#undef POSTBYTES
+
 const char *opcodes_6809[256] = {
-  "NEG <$dd", "?", "?", "COM <$dd", "LSR <$dd", "?", "ROR <$dd", "ASR <$dd",
-  "ASL <$dd", "ROL <$dd", "DEC <$dd", "?", "INC <$dd", "TST <$dd", "JMP <$dd", "CLR <$dd",
-
-  "(extended)", "(extended)", "NOP", "SYNC", "?", "?", "LBRA $rrrr", "LBSR $rrrr",
-                                                   // XXX decode regs for EXG and TFR
-  "?", "DAA", "ORCC #$II", "?", "ANDCC #$II", "SEX", "EXG #$II", "TFR #$II",
-
-  "BRA $rr", "BRN $rr", "BHI $rr", "BLS $rr", "BCC $rr", "BCS $rr", "BNE $rr", "BEQ $rr",
-  "BVC $rr", "BVS $rr", "BPL $rr", "BMI $rr", "BGE $rr", "BLT $rr", "BGT $rr", "BLE $rr",
-                                                                               // XXX decode regs for PSH / PUL
-  "LEAX iiiiiiiiiii", "LEAY iiiiiiiiiii", "LEAS iiiiiiiiiii", "LEAU iiiiiiiiiii", "PSHS #$II", "PULS #$II", "PSHU #$II", "PULU #$II",
+  "NEG", "?", "?", "COM", "LSR", "?", "ROR", "ASR",
+  "ASL", "ROL", "DEC", "?", "INC", "TST", "JMP", "CLR",
+  "(extended)", "(extended)", "NOP", "SYNC", "?", "?", "LBRA", "LBSR",
+  "?", "DAA", "ORCC", "?", "ANDCC", "SEX", "EXG", "TFR",
+  "BRA", "BRN", "BHI", "BLS", "BCC", "BCS", "BNE", "BEQ",
+  "BVC", "BVS", "BPL", "BMI", "BGE", "BLT", "BGT", "BLE",
+  "LEAX", "LEAY", "LEAS", "LEAU", "PSHS", "PULS", "PSHU", "PULU",
   "?", "RTS", "ABX", "RTI", "CWAI", "MUL", "?", "SWI",
-  
   "NEGA", "?", "?", "COMA", "LSRA", "?", "RORA", "ASRA",
   "ASLA", "ROLA", "DECA", "?", "INCA", "TSTA", "?", "CLRA",
-  
   "NEGB", "?", "?", "COMB", "LSRB", "?", "RORB", "ASRB",
   "ASLB", "ROLB", "DECB", "?", "INCB", "TSTB", "?", "CLRB",
-  
-  "NEG iiiiiiiiiii", "?", "?", "COM iiiiiiiiiii", "LSR iiiiiiiiiii", "?", "ROR iiiiiiiiiii", "ASR iiiiiiiiiii",
-  "ASL iiiiiiiiiii", "ROL iiiiiiiiiii", "DEC iiiiiiiiiii", "?", "INC iiiiiiiiiii", "TST iiiiiiiiiii", "JMP iiiiiiiiiii", "CLR iiiiiiiiiii",
-  
-  "NEG $eeee", "?", "?", "COM $eeee", "LSR $eeee", "?", "ROR $eeee", "ASR $eeee",
-  "ASL $eeee", "ROL $eeee", "DEC $eeee", "?", "INC $eeee", "TST $eeee", "JMP $eeee", "CLR $eeee",
-  
-  "SUBA #$II", "CMPA #$II", "SBCA #$II", "SUBD #$IIII", "ANDA #$II", "BITA #$II", "LDA #$II", "?",
-  "EORA #$II", "ADCA #$II", "ORA #$II", "ADDA #$II", "CMPX #$IIII", "BSR $rr", "LDX #$IIII", "?",
-  
-  "SUBA <$dd", "CMPA <$dd", "SBCA <$dd", "SUBD <$dd", "ANDA <$dd", "BITA <$dd", "LDA <$dd", "STA <$dd",
-  "EORA <$dd", "ADCA <$dd", "ORA <$dd", "ADDA <$dd", "CMPX <$dd", "JSR <$dd", "LDX <$dd", "STX <$dd",
-  
-  "SUBA iiiiiiiiiii", "CMPA iiiiiiiiiii", "SBCA iiiiiiiiiii", "SUBD iiiiiiiiiii", "ANDA iiiiiiiiiii", "BITA iiiiiiiiiii", "LDA iiiiiiiiiii", "STA iiiiiiiiiii",
-  "EORA iiiiiiiiiii", "ADCA iiiiiiiiiii", "ORA iiiiiiiiiii", "ADDA iiiiiiiiiii", "CMPX iiiiiiiiiii", "JSR iiiiiiiiiii", "LDX iiiiiiiiiii", "STX iiiiiiiiiii",
-  
-  "SUBA $eeee", "CMPA $eeee", "SBCA $eeee", "SUBD $eeee", "ANDA $eeee", "BITA $eeee", "LDA $eeee", "STA $eeee",
-  "EORA $eeee", "ADCA $eeee", "ORA $eeee", "ADDA $eeee", "CMPX $eeee", "JSR $eeee", "LDX $eeee", "STX $eeee",
-  
-  "SUBB #$II", "CMPB #$II", "SBCB #$II", "ADDD #$II", "ANDB #$II", "BITB #$II", "LDB #$II", "?",
-  "EORB #$II", "ADCB #$II", "ORB #$II", "ADDB #$II", "LDD #$IIII", "?", "LDU #$IIII", "?",
-  
-  "SUBB <$dd", "CMPB <$dd", "SBCB <$dd", "ADDD <$dd", "ANDB <$dd", "BITB <$dd", "LDB <$dd", "STB <$dd",
-  "EORB <$dd", "ADCB <$dd", "ORB <$dd", "ADDB <$dd", "LDD <$dd", "STD <$dd", "LDU <$dd", "STU <$dd",
-  
-  "SUBB iiiiiiiiiii", "CMPB iiiiiiiiiii", "SBCB iiiiiiiiiii", "ADDD iiiiiiiiiii", "ANDB iiiiiiiiiii", "BITB iiiiiiiiiii", "LDB iiiiiiiiiii", "STB iiiiiiiiiii",
-  "EORB iiiiiiiiiii", "ADCB iiiiiiiiiii", "ORB iiiiiiiiiii", "ADDB iiiiiiiiiii", "LDD iiiiiiiiiii", "STD iiiiiiiiiii", "LDU iiiiiiiiiii", "STU iiiiiiiiiii",
-  
-  "SUBB $eeee", "CMPB $eeee", "SBCB $eeee", "ADDD $eeee", "ANDB $eeee", "BITB $eeee", "LDB $eeee", "STB $eeee",
-  "EORB $eeee", "ADCB $eeee", "ORB $eeee", "ADDB $eeee", "LDD $eeee", "STD $eeee", "LDU $eeee", "STU $eeee"
+  "NEG", "?", "?", "COM", "LSR", "?", "ROR", "ASR",
+  "ASL", "ROL", "DEC", "?", "INC", "TST", "JMP", "CLR",
+  "NEG", "?", "?", "COM", "LSR", "?", "ROR", "ASR",
+  "ASL", "ROL", "DEC", "?", "INC", "TST", "JMP", "CLR",
+  "SUBA", "CMPA", "SBCA", "SUBD", "ANDA", "BITA", "LDA", "?",
+  "EORA", "ADCA", "ORA", "ADDA", "CMPX", "BSR", "LDX", "?",
+  "SUBA", "CMPA", "SBCA", "SUBD", "ANDA", "BITA", "LDA", "STA",
+  "EORA", "ADCA", "ORA", "ADDA", "CMPX", "JSR", "LDX", "STX",
+  "SUBA", "CMPA", "SBCA", "SUBD", "ANDA", "BITA", "LDA", "STA",
+  "EORA", "ADCA", "ORA", "ADDA", "CMPX", "JSR", "LDX", "STX",
+  "SUBA", "CMPA", "SBCA", "SUBD", "ANDA", "BITA", "LDA", "STA",
+  "EORA", "ADCA", "ORA", "ADDA", "CMPX", "JSR", "LDX", "STX",
+  "SUBB", "CMPB", "SBCB", "ADDD", "ANDB", "BITB", "LDB", "?",
+  "EORB", "ADCB", "ORB", "ADDB", "LDD", "?", "LDU", "?",
+  "SUBB", "CMPB", "SBCB", "ADDD", "ANDB", "BITB", "LDB", "STB",
+  "EORB", "ADCB", "ORB", "ADDB", "LDD", "STD", "LDU", "STU",
+  "SUBB", "CMPB", "SBCB", "ADDD", "ANDB", "BITB", "LDB", "STB",
+  "EORB", "ADCB", "ORB", "ADDB", "LDD", "STD", "LDU", "STU",
+  "SUBB", "CMPB", "SBCB", "ADDD", "ANDB", "BITB", "LDB", "STB",
+  "EORB", "ADCB", "ORB", "ADDB", "LDD", "STD", "LDU", "STU"
 };
+
+static const char *opcodes_long_cond_branches_6809[] = {
+  "?", "LBRN", "LBHI", "LBLS", "LBCC", "LBCS", "LBNE", "LBEQ",
+  "LBVC", "LBVS", "LBPL", "LBMI", "LBGE", "LBLT", "LBGT", "LBLE"
+};
+
+addrmode_t
+insn_decode_addrmode_indexed_6809(uint8_t pb)
+{
+  // Refer to "TABLE 2 - INDEXED ADDRESSING MODE" in the 6809 data sheet.
+  addrmode_t am;
+
+  // Extended indirect is a slightly special case.
+  if (pb == 0b10011111) {
+    return am6809_extended_ind;
+  }
+
+  // 5-bit constant offset also is a special case.
+  if ((pb & 0b10000000) == 0) {
+    return am6809_const_off5;
+  }
+
+  switch (pb & 0b10001111) {
+    case 0b10000100:
+      am = am6809_zero_off;
+      break;
+
+    case 0b10001000:
+      am = am6809_const_off8;
+      break;
+
+    case 0b10001001:
+      am = am6809_const_off16;
+      break;
+
+    case 0b10000110:
+    case 0b10000101:
+    case 0b10001011:
+      am = am6809_acc_off;
+      break;
+
+    case 0b10000000:
+      am = am6809_post_inc1;
+      break;
+
+    case 0b10000001:
+      am = am6809_post_inc2;
+      break;
+
+    case 0b10000010:
+      am = am6809_pre_dec1;
+      break;
+
+    case 0b10000011:
+      am = am6809_pre_dec2;
+      break;
+
+    case 0b10001100:
+      am = am6809_pcrel8;
+      break;
+
+    case 0b10001101:
+      am = am6809_pcrel16;
+      break;
+
+    default:
+      return am_invalid;
+  }
+
+  if (pb & 0b00010000) {
+    // Indirect flag.
+    if (am == am6809_post_inc1 || am == am6809_pre_dec1) {
+      // Indirect not allowed in this case.
+      return am_invalid;
+    }
+    am = (addrmode_t)((int)am + 1);
+  }
+
+  return am;
+}
+
+addrmode_t
+insn_decode_addrmode_6809(struct insn_decode *id)
+{
+  // Refer to "TABLE 9 - HEXADECIMAL VALUES OF MACHINE CODES" in the 6809 data sheet.
+  // We do incomplete decoding here such that we may return a valid addressing mode
+  // for an invalid opcode.  The hardware also does incomplete decoding, although not
+  // necessarily the same incomplete decoding we do here.
+
+  if (id->bytes_fetched == 0) {
+      return am_invalid;
+  }
+
+  uint32_t opc = id->bytes[0];
+
+  // Check for Page 2 / Page 3 opcodes.
+  if (opc == 0x10 || opc == 0x11) {
+    if (id->bytes_fetched < 2) {
+      return am_invalid;
+    }
+
+    uint32_t extopc = (opc << 8) | id->bytes[1];
+
+    switch (extopc & 0xfff0) {
+      case 0x1020:
+        return am6809_rel16;
+
+      case 0x1030:
+      case 0x1130:
+        return am6809_inherent;
+
+      case 0x1080:
+      case 0x1180:
+      case 0x10c0:
+        return am6809_imm16;
+
+      case 0x1090:
+      case 0x1190:
+      case 0x10d0:
+        return am6809_direct;
+
+      case 0x10a0:
+      case 0x11a0:
+      case 0x10e0:
+        // Indexed; need 3 bytes for this.
+        if (id->bytes_fetched < 3) {
+          return am_invalid;
+        }
+        return insn_decode_addrmode_indexed_6809(id->bytes[2]);
+
+      case 0x10b0:
+      case 0x11b0:
+      case 0x10f0:
+        return am6809_extended;
+
+      default:
+        return am_invalid;
+    }
+  }
+
+  if ((opc >= 0x00 && opc <= 0x0f) ||
+      (opc >= 0x90 && opc <= 0x9f) ||
+      (opc >= 0xd0 && opc <= 0xdf)) {
+    return am6809_direct;
+  }
+
+  if (opc >= 0x10 && opc <= 0x1f) {
+    // This one's a bunch of special cases.
+    switch (opc) {
+      case 0x12:                              // NOP
+      case 0x13:                              // SYNC
+      case 0x19:                              // DAA
+      case 0x1d:                              // SEX
+        return am6809_inherent;
+
+      case 0x16:                              // LBRA
+      case 0x17:                              // LBSR
+        return am6809_rel16;
+
+      case 0x1a:                              // ORCC
+      case 0x1c:                              // ANDCC
+        return am6809_imm8;
+
+      case 0x1e:                              // EXG
+      case 0x1f:                              // TFR
+        return am6809_exg_tfr;
+
+      default:
+        return am_invalid;
+    }
+  }
+
+  if (opc >= 0x20 && opc <= 0x2f) {
+    return am6809_rel8;
+  }
+
+  if (opc >= 0x30 && opc <= 0x3f) {
+    if (opc >= 0x30 && opc <= 0x33) {
+      goto indexed_need2;
+    } else if (opc >= 0x34 && opc <= 0x37) {
+      return am6809_psh_pul;
+    } else if (opc >= 0x39 && opc <= 0x3f) {
+      return am6809_inherent;
+    } else {
+      return am_invalid;
+    }
+  }
+
+  if ((opc >= 0x40 && opc <= 0x4f) ||
+      (opc >= 0x50 && opc <= 0x5f)) {
+    return am6809_inherent;
+  }
+
+  if ((opc >= 0x60 && opc <= 0x6f) ||
+      (opc >= 0xa0 && opc <= 0xaf) ||
+      (opc >= 0xe0 && opc <= 0xef)) {
+ indexed_need2:
+    // Indexed; need 2 bytes for this.
+    if (id->bytes_fetched < 2) {
+      return am_invalid;
+    }
+    return insn_decode_addrmode_indexed_6809(id->bytes[1]);
+  }
+
+  if ((opc >= 0x70 && opc <= 0x7f) ||
+      (opc >= 0xb0 && opc <= 0xbf) ||
+      (opc >= 0xf0 && opc <= 0xff)) {
+    return am6809_extended;
+  }
+
+  if ((opc >= 0x80 && opc <= 0x8f) ||
+      (opc >= 0xc0 && opc <= 0xcf)) {
+    if (opc == 0x8d) {
+      return am6809_rel8; 
+    }
+    opc &= 0xf;
+    if (opc == 0x3 || opc == 0xc || opc == 0xe) {
+      return am6809_imm16;
+    } else {
+      return am6809_imm8;
+    }
+  }
+  return am_invalid;
+}
+
+const char *
+insn_decode_format_exg_tfr_regname_6809(uint8_t v)
+{
+  switch (v) {
+    case 0b0000:  return "D";
+    case 0b0001:  return "X";
+    case 0b0010:  return "Y";
+    case 0b0011:  return "U";
+    case 0b0100:  return "S";
+    case 0b0101:  return "PC";
+    case 0b1000:  return "A";
+    case 0b1001:  return "B";
+    case 0b1010:  return "CCR";
+    case 0b1011:  return "DPR";
+    default:      return "?";
+  }
+}
+
+void
+insn_decode_format_6809(struct insn_decode *id)
+{
+  const char *opc, *cp1, *cp2;
+  char *bp;
+  int i = 1;
+  int j;
+
+  if (id->bytes[0] == 0x10 || id->bytes[0] == 0x11) {
+    uint32_t extopc = (id->bytes[0] << 8) | id->bytes[1];
+    uint32_t extopc_u3 = extopc & 0xfff0;
+    uint32_t extopc_b1 = extopc & 0x000f;
+    i++;
+
+    // Default to "unknown".
+    opc = "?";
+
+    if (extopc >= 0x1020 && extopc <= 0x102f) {
+      opc = opcodes_long_cond_branches_6809[extopc & 0xf];
+    } else if (extopc == 0x103f) {
+      opc = "SWI2";
+    } else if (extopc == 0x113f) {
+      opc = "SWI3";
+    } else if (extopc_u3 == 0x1080 || extopc_u3 == 0x1090 ||
+               extopc_u3 == 0x10a0 || extopc_u3 == 0x10b0) {
+      if (extopc == 0x108f) {
+        // special case (no STY #IMM)
+      } else if (extopc_b1 == 0x3) {
+        opc = "CMPD";
+      } else if (extopc_b1 == 0xc) {
+        opc = "CMPY";
+      } else if (extopc_b1 == 0xe) {
+        opc = "LDY";
+      } else if (extopc_b1 == 0xf) {
+        opc = "STY";
+      }
+    } else if (extopc_u3 == 0x10c0 || extopc_u3 == 0x10d0 ||
+               extopc_u3 == 0x10e0 || extopc_u3 == 0x10f0) {
+      if (extopc == 0x10cf) {
+        // special case (no STS #IMM)
+      } else if (extopc_b1 == 0xe) {
+        opc = "LDS";
+      } else if (extopc_b1 == 0xf) {
+        opc = "STS";
+      }
+    } else if (extopc_u3 == 0x1180 || extopc_u3 == 0x1190 ||
+               extopc_u3 == 0x11a0 || extopc_u3 == 0x11b0) {
+      if (extopc_b1 == 0x3) {
+        opc = "CMPU";
+      } else if (extopc_b1 == 0xc) {
+        opc = "CMPS";
+      }
+    }
+   } else {
+    opc = opcodes_6809[id->bytes[0]];
+  }
+
+  if (id->addrmode < am6809_first || id->addrmode > am6809_last) {
+ unknown_addrmode:
+    sprintf(id->insn_string, "<?ADDRMODE?>");
+    return;
+  }
+
+  uint16_t u16 = 0;
+  int16_t s16 = 0;
+  uint8_t index_reg = (id->bytes[i] >> 5) & 3;
+  uint8_t reg1 = id->bytes[i] >> 4;
+  uint8_t reg2 = id->bytes[i] & 0xf;
+  const char *ind_open;
+  const char *ind_close;
+
+  if (am6809_indirect_p(id->addrmode)) {
+    ind_open = "[";
+    ind_close = "]";
+  } else {
+    ind_open = ind_close = "";
+  }
+
+  static const char *index_regnames[] = { "X", "Y", "U", "S" };
+  static const struct {
+    uint8_t bit;
+    const char *reg;
+  } psh_pul_regnames[] = {
+    { 0b00000001, "CCR" },
+    { 0b00000010, "A" },
+    { 0b00000100, "B" },
+    { 0b00001000, "DPR" },
+    { 0b00010000, "X" },
+    { 0b00100000, "Y" },
+    { 0b01000000, NULL },
+    { 0b10000000, "PC" },
+    { 0,          NULL },
+  };
+
+  // i now points to the first operand byte.
+  switch (id->addrmode) {
+    case am6809_inherent:
+      sprintf(id->insn_string, "%s", opc);
+      break;
+
+    case am6809_direct:
+      sprintf(id->insn_string, "%s < $%02x", opc, id->bytes[i]);
+      break;
+
+    case am6809_extended_ind:
+      // This is really an indexed mode; skip the index postbyte.
+      i++;
+      // FALLTHROUGH
+    case am6809_extended:
+      u16 = (id->bytes[i] << 8) | id->bytes[i + 1];
+      sprintf(id->insn_string, "%s %s$%04x%s", opc, ind_open, u16, ind_close);
+      break;
+
+    case am6809_rel16:
+      s16 = id->bytes[i++] << 8;
+      // FALLTHROUGH
+    case am6809_rel8:
+      s16 |= id->bytes[i];
+      sprintf(id->insn_string, "%s %d", opc, s16);
+      break;
+
+    case am6809_imm8:
+      sprintf(id->insn_string, "%s #$%02x", opc, id->bytes[i]);
+      break;
+
+    case am6809_imm16:
+      u16 = (id->bytes[i] << 8) | id->bytes[i];
+      sprintf(id->insn_string, "%s #$%04x", opc, u16);
+      break;
+
+    case am6809_zero_off:
+    case am6809_zero_off_ind:
+      sprintf(id->insn_string, "%s %s,%s%s", opc, ind_open,
+              index_regnames[index_reg], ind_close);
+      break;
+
+    case am6809_const_off5:
+      s16 = id->bytes[i];
+      s16 = (s16 << 11) >> 11;    // sign-extend and discard extra bits
+      goto const_off;
+
+    case am6809_const_off8:
+    case am6809_const_off8_ind:
+      s16 = (int8_t)id->bytes[i + 1]; // sign-extend
+      goto const_off;
+
+    case am6809_const_off16:
+    case am6809_const_off16_ind:
+      s16 = (id->bytes[i + 1] << 8) | id->bytes[i + 2];
+    const_off:
+      sprintf(id->insn_string, "%s %s%d,%s%s", opc, ind_open,
+          (int)s16, index_regnames[index_reg], ind_close);
+      break;
+
+    case am6809_acc_off:
+    case am6809_acc_off_ind:
+      switch (id->bytes[i] & 0b1111) {
+        case 0b0100: cp1 = "A"; break;
+        case 0b0101: cp1 = "B"; break;
+        case 0b1011: cp1 = "D"; break;
+        default:     cp1 = "?"; break;
+      }
+      sprintf(id->insn_string, "%s %s%s,%s%s", opc, ind_open,
+              cp1, index_regnames[index_reg], ind_close);
+      break;
+
+    case am6809_post_inc1:
+      sprintf(id->insn_string, "%s ,%s+", opc, index_regnames[index_reg]);
+      break;
+
+    case am6809_post_inc2:
+    case am6809_post_inc2_ind:
+      sprintf(id->insn_string, "%s %s,%s++%s", opc, ind_open,
+              index_regnames[index_reg], ind_close);
+      break;
+
+    case am6809_pre_dec1:
+      sprintf(id->insn_string, "%s ,-%s", opc, index_regnames[index_reg]);
+      break;
+
+    case am6809_pre_dec2:
+    case am6809_pre_dec2_ind:
+      sprintf(id->insn_string, "%s %s,--%s%s", opc, ind_open,
+              index_regnames[index_reg], ind_close);
+      break;
+
+    case am6809_pcrel8:
+    case am6809_pcrel8_ind:
+      s16 = (int8_t)id->bytes[i + i]; // sign-extend;
+      goto pcrel;
+
+    case am6809_pcrel16:
+    case am6809_pcrel16_ind:
+      s16 = (id->bytes[i + 1] << 8) | id->bytes[i + 2];
+    pcrel:
+      sprintf(id->insn_string, "%s %s%d,PCR%s", opc, ind_open,
+          (int)s16, ind_close);
+      break;
+
+    case am6809_exg_tfr:
+      cp1 = insn_decode_format_exg_tfr_regname_6809(reg1);
+      cp2 = insn_decode_format_exg_tfr_regname_6809(reg2);
+      sprintf(id->insn_string, "%s %s,%s", opc, cp1, cp2);
+      break;
+
+    case am6809_psh_pul:
+      bp = &id->insn_string[sprintf(id->insn_string, "%s ", opc)];
+      for (j = 0; psh_pul_regnames[j].bit != 0; j++) {
+        if (id->bytes[i] & psh_pul_regnames[j].bit) {
+          if ((cp2 = psh_pul_regnames[j].reg) == NULL) {
+            // special case for U/S
+            if (id->bytes[0] == 0x34 || id->bytes[0] == 0x35) {
+                cp2 = "U";
+            } else {
+                cp2 = "S";
+            }
+          }
+          cp1 = (id->bytes[i] & (psh_pul_regnames[j].bit - 1)) ? "," : "";
+          bp += sprintf(bp, "%s%s", cp1, cp2);
+        }
+      }
+      break;
+
+    default:
+      goto unknown_addrmode;
+  }
+}
+
+void
+insn_decode_next_state_6809(struct insn_decode *id)
+{
+  if (id->state != ds_fetching || id->bytes_fetched == 0) {
+    return;
+  }
+
+  if (id->bytes_required == 0) {
+    // Check for Page 2 and Page 3 opcodes.  We'll have to fetch
+    // an additional byte before we can determine the addressing mode.
+    if (id->bytes_fetched == 1 &&
+        (id->bytes[0] == 0x10 || id->bytes[0] == 0x11)) {
+      return;
+    }
+
+    // We now can try to determine the addressing mode.  It might take
+    // multiple passes, since extended opcodes can have indexed modes,
+    // and that would require fetching a third byte.  Once we have  the
+    // addressing mode, we'll know the total number of bytes that will
+    // be required to fully decode the instruction.
+    id->addrmode = insn_decode_addrmode_6809(id);
+    if (id->addrmode >= am6809_first && id->addrmode <= am6809_last) {
+      id->bytes_required = 1 + insn_postbytes_6809[id->addrmode - am6809_first];
+      if (id->bytes[0] == 0x10 || id->bytes[0] == 0x11) {
+        id->bytes_required++;
+      }
+    }
+  }
+
+  // If we've now fetched the number of required bytes, we can
+  // fully decode and format the instruction.
+  if (id->bytes_fetched == id->bytes_required) {
+    insn_decode_format_6809(id);
+    id->state = ds_complete;
+  }
+}
 
 //
 // MASTER TABLE OF Teensy 4.1 DIGITAL I/O PINS
@@ -632,11 +1197,7 @@ unscramble(void)
    }
 }
 
-//
-// Disassembler support.
-//
-#define INSN_BUFSIZE  32              // Space for formatted instruction
-
+#if 0
 const char *
 disas_6502(int i, char *buf)
 {
@@ -671,6 +1232,7 @@ disas_6502(int i, char *buf)
   strcpy(buf, s.c_str());
   return buf;
 }
+#endif
 
 void
 setBusEnabled(bool e)
@@ -863,11 +1425,61 @@ help(void)
   Serial.println("h or ?               - Show command usage");
 }
 
+void
+insn_decode_init(struct insn_decode *id)
+{
+  id->state = ds_idle;
+  if (cpu == cpu_6809 || cpu == cpu_6809e) {
+    id->next_state = insn_decode_next_state_6809;
+  } else {
+    id->next_state = NULL;
+  }
+}
+
+void
+insn_decode_begin(struct insn_decode *id, uint8_t b)
+{
+  if (id->next_state != NULL && id->state == ds_idle) {
+    id->state = ds_fetching;
+    id->addrmode = am_invalid;
+    id->bytes_required = 0;
+    id->bytes_fetched = 0;
+    id->bytes[id->bytes_fetched++] = b;
+    (*id->next_state)(id);
+  }
+}
+
+bool
+insn_decode_continue(struct insn_decode *id, uint8_t b)
+{
+  if (id->state == ds_fetching) {
+    if (id->bytes_fetched == INSN_DECODE_MAXBYTES) {
+      strcpy(id->insn_string, "<decode overflow>");
+      id->state = ds_complete;
+    } else {
+      id->bytes[id->bytes_fetched++] = b;
+      if (id->bytes_required == 0 || id->bytes_fetched == id->bytes_required) {
+        (*id->next_state)(id);
+      }
+    }
+  }
+  return id->state == ds_fetching;
+}
+
+const char *
+insn_decode_complete(struct insn_decode *id)
+{
+  if (id->state == ds_complete) {
+     id->state = ds_idle;
+     return id->insn_string;
+  }
+  return "";
+}
+
 // List recorded data from start to end.
 void
 list(Stream &stream, int start, int end)
 {
-  char insnbuf[INSN_BUFSIZE];
   char output[80];
 
   int first = (triggerPoint - pretrigger + samples) % samples;
@@ -875,15 +1487,16 @@ list(Stream &stream, int start, int end)
 
   bool seen_lic = false;
 
-  const char *cycle, *opcode;
-  const char *comment;
+  const char *cycle, *comment;
+
+  struct insn_decode id;
+  insn_decode_init(&id);
 
   // Display data
   int i = first;
   int j = 0;
   while (true) {
     cycle = "";
-    opcode = "";
     comment = "";
 
     if ((j >= start) && (j <= end)) {
@@ -891,10 +1504,11 @@ list(Stream &stream, int start, int end)
       // 6502 SYNC high indicates opcode/instruction fetch, otherwise
       // show as read or write.
       if ((cpu == cpu_65c02) || (cpu == cpu_6502)) {
-        if  (control[i] & CC_6502_SYNC) {
+        if (control[i] & CC_6502_SYNC) {
+          insn_decode_begin(&id, data[i]);
           cycle = "F";
-          opcode = disas_6502(i, insnbuf);
         } else if (control[i] & CC_6502_RW) {
+          insn_decode_continue(&id, data[i]);
           cycle = "R";
         } else {
           cycle = "W";
@@ -910,17 +1524,16 @@ list(Stream &stream, int start, int end)
           cycle = "-";
         } else if (control[i] & CC_6809_RW) {
           // On 6809E, if we saw LIC on the previous cycle, then
-          // this is an insn fetch.  We're just going to assume
-          // that the first sample is an insn fetch, because we
-          // don't have any other indication.
+          // this is an insn fetch.
           cycle = "R";
           if (cpu == cpu_6809e) {
-            if (seen_lic || j == 0) {
-              opcode = opcodes_6809[data[i]];
+            if (seen_lic) {
+              cycle = "F";
+              insn_decode_begin(&id, data[i]);
               seen_lic = false;
+            } else {
+              insn_decode_continue(&id, data[i]);
             }
-          } else {
-            opcode = opcodes_6809[data[i]];
           }
         } else {
           cycle = "W";
@@ -940,9 +1553,10 @@ list(Stream &stream, int start, int end)
 
         if (!(control[i] & CC_Z80_M1)) {
           cycle = "F";
-          opcode = opcodes_z80[data[i]];
+          insn_decode_begin(&id, data[i]);
         } else if (!(control[i] & CC_Z80_MREQ) && !(control[i] & CC_Z80_RD)) {
           cycle = "R";
+          insn_decode_continue(&id, data[i]);
         } else if (!(control[i] & CC_Z80_MREQ) && !(control[i] & CC_Z80_WR)) {
           cycle = "W";
         } else if (!(control[i] & CC_Z80_IORQ) && !(control[i] & CC_Z80_RD)) {
@@ -964,7 +1578,6 @@ list(Stream &stream, int start, int end)
         } else {
           if (control[i] & CC_6800_RW) {
             cycle = "R";
-            opcode = opcodes_6800[data[i]];
           } else {
             cycle = "W";
           }
@@ -1059,9 +1672,10 @@ list(Stream &stream, int start, int end)
         comment = "<--- TRIGGER ----";
       }
 
-      sprintf(output, "%04lX  %-2s  %02lX  %-12s  %s",
-              address[i], cycle, data[i], opcode, comment
-             );
+      sprintf(output,
+          "%04lX  %-2s  %02lX  %-20s  %s",
+          address[i], cycle, data[i], insn_decode_complete(&id),
+          comment);
 
       stream.println(output);
     }
