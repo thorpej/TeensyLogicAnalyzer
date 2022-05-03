@@ -124,6 +124,34 @@ bool triggerLevel = false;            // Trigger level (false=low, true=high);
 volatile bool triggerPressed = false; // Set by hardware trigger button
 
 //
+// Helpers to return datums of various types from the data buffer at the
+// specified offset.
+//
+uint16_t
+read_u16le(const uint8_t *buf, int i)
+{
+  return buf[i] | (buf[i + 1] << 8);
+}
+
+int16_t
+read_s16le(const uint8_t *buf, int i)
+{
+  return (int16_t)read_u16le(buf, i);
+}
+
+uint16_t
+read_u16be(const uint8_t *buf, int i)
+{
+  return (buf[i] << 8) | buf[i + i];
+}
+
+int16_t
+read_s16be(const uint8_t *buf, int i)
+{
+  return (int16_t)read_u16be(buf, i);
+}
+
+//
 // Instruction decoding.
 //
 // The decode buffer runs through a small state machine, gathering bytes until it
@@ -684,7 +712,7 @@ insn_decode_format_6809(struct insn_decode *id)
       i++;
       // FALLTHROUGH
     case am6809_extended:
-      u16 = (id->bytes[i] << 8) | id->bytes[i + 1];
+      u16 = read_u16be(id->bytes, i);
       sprintf(id->insn_string, "%s %s$%04x%s", opc, ind_open, u16, ind_close);
       break;
 
@@ -693,7 +721,7 @@ insn_decode_format_6809(struct insn_decode *id)
       goto rel;
 
     case am6809_rel16:
-      s16 = (id->bytes[i + 1] << 8) | id->bytes[i + 2];
+      s16 = read_s16be(id->bytes, i);
     rel:
       reloff = s16;
       sprintf(id->insn_string, "%s %d", opc, s16);
@@ -704,7 +732,7 @@ insn_decode_format_6809(struct insn_decode *id)
       break;
 
     case am6809_imm16:
-      u16 = (id->bytes[i] << 8) | id->bytes[i];
+      u16 = read_u16be(id->bytes, i);
       sprintf(id->insn_string, "%s #$%04x", opc, u16);
       break;
 
@@ -726,7 +754,7 @@ insn_decode_format_6809(struct insn_decode *id)
 
     case am6809_const_off16:
     case am6809_const_off16_ind:
-      s16 = (id->bytes[i + 1] << 8) | id->bytes[i + 2];
+      s16 = read_s16be(id->bytes, i + i);
     const_off:
       sprintf(id->insn_string, "%s %s%d,%s%s", opc, ind_open,
           (int)s16, index_regnames[index_reg], ind_close);
@@ -771,7 +799,7 @@ insn_decode_format_6809(struct insn_decode *id)
 
     case am6809_pcrel16:
     case am6809_pcrel16_ind:
-      s16 = (id->bytes[i + 1] << 8) | id->bytes[i + 2];
+      s16 = read_s16be(id->bytes, i + 1);
     pcrel:
       reloff = s16;
       sprintf(id->insn_string, "%s %s%d,PCR%s", opc, ind_open,
