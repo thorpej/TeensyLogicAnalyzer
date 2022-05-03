@@ -135,6 +135,8 @@ typedef enum { ds_idle, ds_fetching, ds_complete } decode_state_t;
 struct insn_decode {
   decode_state_t      state;
   uint32_t            insn_address;
+  uint32_t            resolved_address;
+  bool                resolved_address_valid;
   void                (*next_state)(struct insn_decode *);
   int                 bytes_required;
   int                 bytes_fetched;
@@ -640,6 +642,7 @@ insn_decode_format_6809(struct insn_decode *id)
   uint8_t index_reg = (id->bytes[i] >> 5) & 3;
   uint8_t reg1 = id->bytes[i] >> 4;
   uint8_t reg2 = id->bytes[i] & 0xf;
+  int16_t reloff = 0;
   const char *ind_open;
   const char *ind_close;
 
@@ -685,11 +688,14 @@ insn_decode_format_6809(struct insn_decode *id)
       sprintf(id->insn_string, "%s %s$%04x%s", opc, ind_open, u16, ind_close);
       break;
 
-    case am6809_rel16:
-      s16 = id->bytes[i++] << 8;
-      // FALLTHROUGH
     case am6809_rel8:
-      s16 |= id->bytes[i];
+      s16 = (int8_t)id->bytes[i]; // sign-extend;
+      goto rel;
+
+    case am6809_rel16:
+      s16 = (id->bytes[i + 1] << 8) | id->bytes[i + 2];
+    rel:
+      reloff = s16;
       sprintf(id->insn_string, "%s %d", opc, s16);
       break;
 
@@ -767,6 +773,7 @@ insn_decode_format_6809(struct insn_decode *id)
     case am6809_pcrel16_ind:
       s16 = (id->bytes[i + 1] << 8) | id->bytes[i + 2];
     pcrel:
+      reloff = s16;
       sprintf(id->insn_string, "%s %s%d,PCR%s", opc, ind_open,
           (int)s16, ind_close);
       break;
@@ -797,6 +804,21 @@ insn_decode_format_6809(struct insn_decode *id)
 
     default:
       goto unknown_addrmode;
+  }
+
+  switch (id->addrmode) {
+    case am6809_rel8:
+    case am6809_rel16:
+    case am6809_pcrel8:
+    case am6809_pcrel8_ind:
+    case am6809_pcrel16:
+    case am6809_pcrel16_ind:
+      id->resolved_address = id->insn_address + reloff;
+      id->resolved_address_valid = true;
+      break;
+
+    default:
+      break;
   }
 }
 
@@ -1443,6 +1465,8 @@ insn_decode_begin(struct insn_decode *id, uint32_t addr, uint8_t b)
   if (id->next_state != NULL && id->state == ds_idle) {
     id->state = ds_fetching;
     id->insn_address = addr;
+    id->resolved_address = 0;
+    id->resolved_address_valid = false;
     id->addrmode = am_invalid;
     id->bytes_required = 0;
     id->bytes_fetched = 0;
