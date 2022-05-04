@@ -96,28 +96,18 @@ typedef enum {
   am6809_last             = 28,
 
   //
-  // 6502 addressing modes.  Refer to Section 4 of the WDC 65C02 data sheet.
+  // 6502 addressing modes.  These are all pseudo-modes
+  // that only represent the number of post-opcode bytes
+  // and how to display them.  See commentary below.
   //
   am6502_first            = 29,
 
-  am6502_abs,             = 29,   // Absolute a
-  am6502_abs_idx_ind,     = 30,   // Absolute Indexed Indirect (a,x)
-  am6502_abs_idx_x,       = 31,   // Absolute Indexed with X a,x
-  am6502_abs_idx_y,       = 32,   // Absolute Indexed with Y a,y
-  am6502_abs_ind,         = 33,   // Absolute Indirect (a)
-  am6502_acc_a            = 34,   // Accumulator A
-  am6502_imm,             = 35,   // Immediate Addressing #
-  am6502_implied,         = 36,   // Implied i
-  am6502_pcrel,           = 37,   // Program Counter Relative r
-  am6502_stack,           = 38,   // Stack s
-  am6502_zp,              = 39,   // Zero Page zp
-  am6502_zp_idx_ind,      = 40,   // Zero Page Indexed Indirect (zp,x)
-  am6502_zp_idx_x,        = 41,   // Zero Page Indexed with X zp,x
-  am6502_zp_idx_y,        = 42,   // Zero Page Indexed with Y zp,y
-  am6502_zp_ind,          = 43,   // Zero Page Indirect (zp)
-  am6502_zp_ind_idx_y,    = 44,   // Zero Page Indirect Indexed with Y (zp),y
+  am6502_implied          = 29,
+  am6502_u8               = 30, // nn
+  am6502_u16              = 31, // nnnn
+  am6502_rel8             = 32, // rrrr
 
-  am6502_last             = 44,
+  am6502_last             = 32,
 } addrmode_t;
 
 #define am6809_indexed_p(am)  ((am) >= am6809_zero_off && (am) <= am6809_extended_ind)
@@ -126,6 +116,8 @@ typedef enum {
                                (am) == am6809_post_inc2_ind || (am) == am6809_pre_dec2_ind || \
                                (am) == am6809_pcrel8_ind || (am) == am6809_pcrel16_ind || \
                                (am) == am6809_extended_ind)
+
+#define am6502_65c02_only(am) ((am) == am6502_abs_idx_ind || (am) == am6502_zp_ind)
 
 // Global variables
 uint32_t control[BUFFSIZE];           // Recorded control line data
@@ -197,79 +189,170 @@ struct insn_decode {
   char                insn_string[INSN_DECODE_MAXSTRING];
 };
 
-#if 0
-// Instructions for 65C02 disassembler.
+//
+// 6502 instruction decoding
+//
+// The 6502 / 65C02 don't have nearly the same addressing mode complexity as
+// the 6809, so we take a different tack here; the number of bytes following
+// the opcode is kept alongside the opcode, along with the rest of the formatting
+// to display it:
+//
+// nn     read an additional byte after the opcode, replace with hex
+//        representation
+//
+// nnnn   read an additional 2 bytes after the opcode, replace with hex
+//        representation
+//
+// rrrr   read an additional byte after the opcode, replace with signed
+//        decimal representation.  This will also cause us to calculate
+//        the resolved address.
+//
 const char *opcodes_65c02[256] = {
-  "BRK", "ORA (nn,X)", "?", "?", "TSB nn", "ORA nn", "ASL nn", "RMB0 nn",
-  "PHP", "ORA #nn", "ASLA", "?", "TSB XXXX", "ORA nnnn", "ASL nnnn", "BBR0 nn",
-  "BPL rr", "ORA (nn),Y", "ORA (nn)", "?", "TRB nn", "ORA nn,X", "ASL nn,X", "RMB1 nn",
-  "CLC", "ORA nnnn,Y", "INCA", "?", "TRB nn", "ORA nnnn,X", "ASL nnnn,X", "BBR1 nn",
-  "JSR nnnn", "AND (nn,X)", "?", "?", "BIT nn", "AND nn", "ROL nn", "RMB2 nn",
-  "PLP", "AND #nn", "ROLA", "?", "BIT nnnn", "AND nnnn", "ROL nnnn", "BBR2 nn",
-  "BMI rr", "AND (nn),Y", "AND (nn)", "?", "BIT nn,X", "AND nn,X", "ROL nn,X", "RMB3 nn",
-  "SEC", "AND nnnn,Y", "DECA", "?", "BIT nn,X", "AND nnnn,X", "ROL nnnn,X", "BBR3 nn",
-  "RTI", "EOR (nn,X)", "?", "?", "?", "EOR nn", "LSR nn", "RMB4 nn",
-  "PHA", "EOR #nn", "LSRA", "?", "JMP nnnn", "EOR nnnn", "LSR nnnn", "BBR4 nn",
-  "BVC rr", "EOR (nn),Y", "EOR (nn)", "?", "?", "EOR nn,X", "LSR nn,X", "RMB5 nn",
-  "CLI", "EOR nnnn,Y", "PHY", "?", "?", "EOR nnnn,X", "LSR nnnn,X", "BBR5 nn",
-  "RTS", "ADC (nn,X)", "?", "?", "STZ nn", "ADC nn", "ROR nn", "RMB6 nn",
-  "PLA", "ADC #nn", "RORA", "?", "JMP (nnnn)", "ADC nnnn", "ROR nnnn", "BBR6 nn",
-  "BVS rr", "ADC (nn),Y", "ADC (nn)", "?", "STZ nn,X", "ADC nn,X", "ROR nn,X", "RMB7 nn",
-  "SEI", "ADC nnnn,Y", "PLY", "?", "JMP (nn,X)", "ADC nnnn,X", "ROR nnnn,X", "BBR7 nn",
-  "BRA rr", "STA (nn,X)", "?", "?", "STY nn", "STA nn", "STX nn", "SMB0 nn",
-  "DEY", "BIT #nn", "TXA", "?", "STY nnnn", "STA nnnn", "STX nnnn", "BBS0 nn",
-  "BCC rr", "STA (nn),Y", "STA (nn)", "?", "STY nn,X", "STA nn,X", "STX (nn),Y", "SMB1 nn",
-  "TYA", "STA nnnn,Y", "TXS", "?", "STZ nn", "STA nnnn,X", "STZ nn,X", "BBS1 nn",
-  "LDY #nn", "LDA (nn,X)", "LDX #nn", "?", "LDY nn", "LDA nnnn", "LDX nn", "SMB2 nn",
-  "TAY", "LDA #nn", "TAX", "?", "LDY nnnn", "LDA nnnn", "LDX nnnn", "BBS2 nn",
-  "BCS rr", "LDA (nn),Y", "LDA (nn)", "?", "LDY nn,X", "LDA nn,X", "LDX (nn),Y", "SMB3 nn",
-  "CLV", "LDA nnnn,Y", "TSX", "?", "LDY nnnn,X", "LDA nnnn,X", "LDX nnnn,Y", "BBS3 nn",
-  "CPY #nn", "CMP (nn,X)", "?", "?", "CPY nnnn", "CMP nnnn", "DEC nnnn", "SMB4 nn",
-  "INY", "CMP #nn", "DEX", "WAI", "CPY nn", "CMP nn", "DEC nn", "BBS4 nn",
-  "BNE rr", "CMP (nn),Y", "CMP (nn)", "?", "?", "CMP nn,X", "DEC nn,X", "SMB5 nn",
-  "CLD", "CMP nnnn,Y", "PHX", "STP", "?", "CMP nnnn,X", "DEC nnnn,X", "BBS5 nn",
-  "CPX #nn", "SBC (nn,X)", "?", "?", "CPX nn", "SBC nn", "INC nn", "SMB6 nn",
-  "INX", "SBC #nn", "NOP", "?", "CPX nnnn", "SBC nnnn", "INC nnnn", "BBS6 nn",
-  "BEQ rr", "SBC (nn),Y", "SBC (nn)", "?", "?", "SBC nn,X", "INC nn,X", "SMB7 nn",
-  "SED", "SBC nnnn,Y", "PLX", "?", "?", "SBC nnnn,X", "INC nnnn,X", "BBS7 nnnn"
+  "BRK",       "ORA ($nn,X)", "?",         "?",   "TSB $nn",     "ORA $nn",     "ASL $nn",     "RMB0 $nn",
+  "PHP",       "ORA #$nn",    "ASLA",      "?",   "TSB XXXX",    "ORA $nnnn",   "ASL $nnnn",   "BBR0 $nn",
+  "BPL rr",    "ORA ($nn),Y", "ORA ($nn)", "?",   "TRB $nn",     "ORA $nn,X",   "ASL $nn,X",   "RMB1 $nn",
+  "CLC",       "ORA $nnnn,Y", "INCA",      "?",   "TRB $nn",     "ORA $nnnn,X", "ASL $nnnn,X", "BBR1 $nn",
+  "JSR $nnnn", "AND ($nn,X)", "?",         "?",   "BIT $nn",     "AND $nn",     "ROL $nn",     "RMB2 $nn",
+  "PLP",       "AND #$nn",    "ROLA",      "?",   "BIT $nnnn",   "AND $nnnn",   "ROL $nnnn",   "BBR2 $nn",
+  "BMI rr",    "AND ($nn),Y", "AND ($nn)", "?",   "BIT $nn,X",   "AND $nn,X",   "ROL $nn,X",   "RMB3 $nn",
+  "SEC",       "AND $nnnn,Y", "DECA",      "?",   "BIT $nn,X",   "AND $nnnn,X", "ROL $nnnn,X", "BBR3 $nn",
+  "RTI",       "EOR ($nn,X)", "?",         "?",   "?",           "EOR $nn",     "LSR $nn",     "RMB4 $nn",
+  "PHA",       "EOR #$nn",    "LSRA",      "?",   "JMP $nnnn",   "EOR $nnnn",   "LSR $nnnn",   "BBR4 $nn",
+  "BVC rr",    "EOR ($nn),Y", "EOR ($nn)", "?",   "?",           "EOR $nn,X",   "LSR $nn,X",   "RMB5 $nn",
+  "CLI",       "EOR $nnnn,Y", "PHY",       "?",   "?",           "EOR $nnnn,X", "LSR $nnnn,X", "BBR5 $nn",
+  "RTS",       "ADC ($nn,X)", "?",         "?",   "STZ $nn",     "ADC $nn",     "ROR $nn",     "RMB6 $nn",
+  "PLA",       "ADC #$nn",    "RORA",      "?",   "JMP ($nnnn)", "ADC $nnnn",   "ROR $nnnn",   "BBR6 $nn",
+  "BVS rr",    "ADC ($nn),Y", "ADC ($nn)", "?",   "STZ $nn,X",   "ADC $nn,X",   "ROR $nn,X",   "RMB7 $nn",
+  "SEI",       "ADC $nnnn,Y", "PLY",       "?",   "JMP ($nn,X)", "ADC $nnnn,X", "ROR $nnnn,X", "BBR7 $nn",
+  "BRA rr",    "STA ($nn,X)", "?",         "?",   "STY $nn",     "STA $nn",     "STX $nn",     "SMB0 $nn",
+  "DEY",       "BIT #$nn",    "TXA",       "?",   "STY $nnnn",   "STA $nnnn",   "STX $nnnn",   "BBS0 $nn",
+  "BCC rr",    "STA ($nn),Y", "STA ($nn)", "?",   "STY $nn,X",   "STA $nn,X",   "STX ($nn),Y", "SMB1 $nn",
+  "TYA",       "STA $nnnn,Y", "TXS",       "?",   "STZ $nn",     "STA $nnnn,X", "STZ $nn,X",   "BBS1 $nn",
+  "LDY #$nn",  "LDA ($nn,X)", "LDX #$nn",  "?",   "LDY $nn",     "LDA $nnnn",   "LDX $nn",     "SMB2 $nn",
+  "TAY",       "LDA #$nn",    "TAX",       "?",   "LDY $nnnn",   "LDA $nnnn",   "LDX $nnnn",   "BBS2 $nn",
+  "BCS rr",    "LDA ($nn),Y", "LDA ($nn)", "?",   "LDY $nn,X",   "LDA $nn,X",   "LDX ($nn),Y", "SMB3 $nn",
+  "CLV",       "LDA $nnnn,Y", "TSX",       "?",   "LDY $nnnn,X", "LDA $nnnn,X", "LDX $nnnn,Y", "BBS3 $nn",
+  "CPY #$nn",  "CMP ($nn,X)", "?",         "?",   "CPY $nnnn",   "CMP $nnnn",   "DEC $nnnn",   "SMB4 $nn",
+  "INY",       "CMP #$nn",    "DEX",       "WAI", "CPY $nn",     "CMP $nn",     "DEC $nn",     "BBS4 $nn",
+  "BNE rr",    "CMP ($nn),Y", "CMP ($nn)", "?",   "?",           "CMP $nn,X",   "DEC $nn,X",   "SMB5 $nn",
+  "CLD",       "CMP $nnnn,Y", "PHX",       "STP", "?",           "CMP $nnnn,X", "DEC $nnnn,X", "BBS5 $nn",
+  "CPX #$nn",  "SBC ($nn,X)", "?",         "?",   "CPX $nn",     "SBC $nn",     "INC $nn",     "SMB6 $nn",
+  "INX",       "SBC #$nn",    "NOP",       "?",   "CPX $nnnn",   "SBC $nnnn",   "INC $nnnn",   "BBS6 $nn",
+  "BEQ rr",    "SBC ($nn),Y", "SBC ($nn)", "?",   "?",           "SBC $nn,X",   "INC $nn,X",   "SMB7 $nn",
+  "SED",       "SBC $nnnn,Y", "PLX",       "?",   "?",           "SBC $nnnn,X", "INC $nnnn,X", "BBS7 $nnnn"
 };
 
-// Instructions for 6502 disassembler.
 const char *opcodes_6502[256] = {
-  "BRK", "ORA (nn,X)", "?", "?", "?", "ORA nn", "ASL nn", "?",
-  "PHP", "ORA #nn", "ASLA", "?", "?", "ORA nnnn", "ASL nnnn", "?",
-  "BPL rr", "ORA (nn),Y", "?", "?", "?", "ORA nn,X", "ASL nn,X", "?",
-  "CLC", "ORA nnnn,Y", "?", "?", "?", "ORA nnnn,X", "ASL nnnn,X", "?",
-  "JSR nnnn", "AND (nn,X)", "?", "?", "BIT nn", "AND nn", "ROL nn", "?",
-  "PLP", "AND #nn", "ROLA", "?", "BIT nnnn", "AND nnnn", "ROL nnnn", "?",
-  "BMI rr", "AND (nn),Y", "?", "?", "?", "AND nn,X", "ROL nn,X", "?",
-  "SEC", "AND nnnn,Y", "?", "?", "?", "AND nnnn,X", "ROL nnnn,X", "?",
-  "RTI", "EOR (nn,X)", "?", "?", "?", "EOR nn", "LSR nn", "?",
-  "PHA", "EOR #nn", "LSRA", "?", "JMP nnnn", "EOR nnnn", "LSR nnnn", "?",
-  "BVC rr", "EOR (nn),Y", "?", "?", "?", "EOR nn,X", "LSR nn,X", "?",
-  "CLI", "EOR nnnn,Y", "?", "?", "?", "EOR nnnn,X", "LSR nnnn,X", "?",
-  "RTS", "ADC (nn,X)", "?", "?", "?", "ADC nn", "ROR nn", "?",
-  "PLA", "ADC #nn", "RORA", "?", "JMP (nnnn)", "ADC nnnn", "ROR nnnn", "?",
-  "BVS rr", "ADC (nn),Y", "?", "?", "?", "ADC nn,X", "ROR nn,X", "?",
-  "SEI", "ADC nnnn,Y", "?", "?", "?", "ADC nnnn,X", "ROR nnnn,X", "?",
-  "?", "STA (nn,X)", "?", "?", "STY nn", "STA nn", "STX nn", "?",
-  "DEY", "?", "TXA", "?", "STY nnnn", "STA nnnn", "STX nnnn", "?",
-  "BCC rr", "STA (nn),Y", "?", "?", "STY nn,X", "STA nn,X", "STX nn,Y", "?",
-  "TYA", "STA nnnn,Y", "TXS", "?", "?", "STA nnnn,X", "?", "?",
-  "LDY #nn", "LDA (nn,X)", "LDX #nn", "?", "LDY nn", "LDA nn", "LDX nn", "?",
-  "TAY", "LDA #nn", "TAX", "?", "LDY nnnn", "LDA nnnn", "LDX nnnn", "?",
-  "BCS rr", "LDA (nn),Y", "?", "?", "LDY nn,X", "LDA nn,X", "LDX nn,Y", "?",
-  "CLV", "LDA nnnn,Y", "TSX", "?", "LDY nnnn,X", "LDA nnnn,X", "LDX nnnn,Y", "?",
-  "CPY #nn", "CMP (nn,X)", "?", "?", "CPY nn", "CMP nn", "DEC nn", "?",
-  "INY", "CMP #nn", "DEX", "?", "CPY nnnn", "CMP nnnn", "DEC nnnn", "?",
-  "BNE rr", "CMP (nn),Y", "?", "?", "?", "CMP nn,X", "DEC nn,X", "?",
-  "CLD", "CMP nnnn,Y", "?", "?", "?", "CMP nnnn,X", "DEC nnnn,X", "?",
-  "CPX #nn", "SBC (nn,X)", "?", "?", "CPX nn", "SBC nn", "INC nn", "?",
-  "INX", "SBC #nn", "NOP", "?", "CPX nnnn", "SBC nnnn", "INC nnnn", "?",
-  "BEQ rr", "SBC (nn),Y", "?", "?", "?", "SBC nn,X", "INC nn,X", "?",
-  "SED", "SBC nnnn,Y", "?", "?", "?", "SBC nnnn,X", "INC nnnn,X", "?"
+  "BRK",       "ORA ($nn,X)", "?",        "?", "?",           "ORA $nn",     "ASL $nn",     "?",
+  "PHP",       "ORA #$nn",    "ASLA",     "?", "?",           "ORA $nnnn",   "ASL $nnnn",   "?",
+  "BPL rr",    "ORA ($nn),Y", "?",        "?", "?",           "ORA $nn,X",   "ASL $nn,X",   "?",
+  "CLC",       "ORA $nnnn,Y", "?",        "?", "?",           "ORA $nnnn,X", "ASL $nnnn,X", "?",
+  "JSR $nnnn", "AND ($nn,X)", "?",        "?", "BIT $nn",     "AND $nn",     "ROL $nn",     "?",
+  "PLP",       "AND #$nn",    "ROLA",     "?", "BIT $nnnn",   "AND $nnnn",   "ROL $nnnn",   "?",
+  "BMI rr",    "AND ($nn),Y", "?",        "?", "?",           "AND $nn,X",   "ROL $nn,X",   "?",
+  "SEC",       "AND $nnnn,Y", "?",        "?", "?",           "AND $nnnn,X", "ROL $nnnn,X", "?",
+  "RTI",       "EOR ($nn,X)", "?",        "?", "?",           "EOR nn",      "LSR $nn",     "?",
+  "PHA",       "EOR #$nn",    "LSRA",     "?", "JMP $nnnn",   "EOR $nnnn",   "LSR $nnnn",   "?",
+  "BVC rr",    "EOR ($nn),Y", "?",        "?", "?",           "EOR $nn,X",   "LSR $nn,X",   "?",
+  "CLI",       "EOR $nnnn,Y", "?",        "?", "?",           "EOR $nnnn,X", "LSR $nnnn,X", "?",
+  "RTS",       "ADC ($nn,X)", "?",        "?", "?",           "ADC $nn",     "ROR $nn",     "?",
+  "PLA",       "ADC #$nn",    "RORA",     "?", "JMP ($nnnn)", "ADC $nnnn",   "ROR $nnnn",   "?",
+  "BVS rr",    "ADC ($nn),Y", "?",        "?", "?",           "ADC $nn,X",   "ROR $nn,X",   "?",
+  "SEI",       "ADC $nnnn,Y", "?",        "?", "?",           "ADC $nnnn,X", "ROR $nnnn,X", "?",
+  "?",         "STA ($nn,X)", "?",        "?", "STY $nn",     "STA $nn",     "STX $nn",     "?",
+  "DEY",       "?",           "TXA",      "?", "STY $nnnn",   "STA $nnnn",   "STX $nnnn",   "?",
+  "BCC rr",    "STA ($nn),Y", "?",        "?", "STY $nn,X",   "STA $nn,X",   "STX $nn,Y",   "?",
+  "TYA",       "STA $nnnn,Y", "TXS",      "?", "?",           "STA $nnnn,X", "?",           "?",
+  "LDY #$nn",  "LDA ($nn,X)", "LDX #$nn", "?", "LDY $nn",     "LDA $nn",     "LDX $nn",     "?",
+  "TAY",       "LDA #$nn",    "TAX",      "?", "LDY $nnnn",   "LDA $nnnn",   "LDX $nnnn",   "?",
+  "BCS rr",    "LDA ($nn),Y", "?",        "?", "LDY $nn,X",   "LDA $nn,X",   "LDX $nn,Y",   "?",
+  "CLV",       "LDA $nnnn,Y", "TSX",      "?", "LDY $nnnn,X", "LDA $nnnn,X", "LDX $nnnn,Y", "?",
+  "CPY #$nn",  "CMP ($nn,X)", "?",        "?", "CPY $nn",     "CMP $nn",     "DEC $nn",     "?",
+  "INY",       "CMP #$nn",    "DEX",      "?", "CPY $nnnn",   "CMP $nnnn",   "DEC $nnnn",   "?",
+  "BNE rr",    "CMP ($nn),Y", "?",        "?", "?",           "CMP $nn,X",   "DEC $nn,X",   "?",
+  "CLD",       "CMP $nnnn,Y", "?",        "?", "?",           "CMP $nnnn,X", "DEC $nnnn,X", "?",
+  "CPX #$nn",  "SBC ($nn,X)", "?",        "?", "CPX $nn",     "SBC $nn",     "INC $nn",     "?",
+  "INX",       "SBC #$nn",    "NOP",      "?", "CPX $nnnn",   "SBC $nnnn",   "INC $nnnn",   "?",
+  "BEQ rr",    "SBC ($nn),Y", "?",        "?", "?",           "SBC $nn,X",   "INC $nn,X",   "?",
+  "SED",       "SBC $nnnn,Y", "?",        "?", "?",           "SBC $nnnn,X", "INC $nnnn,X", "?"
 };
 
+void
+insn_decode_format_6502(struct insn_decode *id)
+{
+  const char **opcodes = (cpu == cpu_65c02) ? opcodes_65c02 : opcodes_6502;
+  char *cp, op[5];
+  int16_t val;
+
+  strcpy(id->insn_string, opcodes[id->bytes[0]]);
+
+  switch (id->addrmode) {
+    case am6502_u8:
+      val = id->bytes[1];
+      if ((cp = strstr(id->insn_string, "nn")) != NULL) {
+        sprintf(op, "%02X", val);
+        memcpy(cp, op, 2);
+      }
+      break;
+
+    case am6502_u16:
+      val = read_u16le(id->bytes, 1);
+      if ((cp = strstr(id->insn_string, "nnnn")) != NULL) {
+        sprintf(op, "%04X", val);
+        memcpy(cp, op, 4);
+      }
+      break;
+
+    case am6502_rel8:
+      val = (int8_t)id->bytes[1];   // sign-extend
+      if ((cp = strstr(id->insn_string, "rrrr")) != NULL) {
+        sprintf(op, "%4d", val);
+        memcpy(cp, op, 4);
+        id->resolved_address = id->insn_address + id->bytes_required + val;
+        id->resolved_address_valid = true;
+      }
+
+    default:
+      break;
+  }
+}
+
+void
+insn_decode_next_state_6502(struct insn_decode *id)
+{
+  
+  if (id->state != ds_fetching || id->bytes_fetched == 0) {
+    return;
+  }
+
+  if (id->bytes_required == 0) {
+    const char **opcodes = (cpu == cpu_65c02) ? opcodes_65c02 : opcodes_6502;
+    const char *cp1 = opcodes[id->bytes[0]];
+
+    if (strstr(cp1, "nnnn") != NULL) {
+      id->addrmode = am6502_u16;
+      id->bytes_required = 3;
+    } else if (strstr(cp1, "nn") != NULL) {
+      id->addrmode = am6502_u8;
+      id->bytes_required = 2;
+    } else if (strstr(cp1, "rrrr") != NULL) {
+      id->addrmode = am6502_rel8;
+      id->bytes_required = 2;
+    } else {
+      id->addrmode = am6502_implied;
+      id->bytes_required = 1;
+    }
+  }
+
+  // If we've now fetched the number of required bytes, we can
+  // fully decode and format the instruction.
+  if (id->bytes_fetched == id->bytes_required) {
+    insn_decode_format_6502(id);
+    id->state = ds_complete;
+  }
+}
+
+#if 0
 // Instructions for Z80 disassembler.
 // Two-byte extended instructions are not yet supported.
 const char *opcodes_z80[256] = {
@@ -1271,43 +1354,6 @@ unscramble(void)
     data[i]    = unscramble_CDxx(data[i]);
    }
 }
-
-#if 0
-const char *
-disas_6502(int i, char *buf)
-{
-  const char *opcode;
-
-  if (cpu == cpu_65c02) {
-    opcode = opcodes_65c02[data[i]];
-  } else {
-    opcode = opcodes_6502[data[i]];
-  }
-  String s = opcode;
-  // Fill in operands
-  if (s.indexOf("nnnn") != -1) { // absolute
-    char op[5];
-    sprintf(op, "$%04lX", data[i + 1] + 256 * data[i + 2]);
-    s.replace("nnnn", op);
-  }
-  if (s.indexOf("nn") != -1) { // page zero
-    char op[3];
-    sprintf(op, "$%02lX", data[i + 1]);
-    s.replace("nn", op);
-  }
-  if (s.indexOf("rr") != -1) { // relative branch
-    char op[3];
-    if (data[i + 1] < 0x80) {
-      sprintf(op, "$%04lX", address[i] + 2 + data[i + 1]);
-    } else {
-      sprintf(op, "$%04lX", address[i] + 2 - (256 - data[i + 1]));
-    }
-    s.replace("rr", op);
-  }
-  strcpy(buf, s.c_str());
-  return buf;
-}
-#endif
 
 void
 setBusEnabled(bool e)
