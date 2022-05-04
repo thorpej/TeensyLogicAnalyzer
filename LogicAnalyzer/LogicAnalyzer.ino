@@ -110,14 +110,11 @@ typedef enum {
   am6502_last             = 32,
 } addrmode_t;
 
-#define am6809_indexed_p(am)  ((am) >= am6809_zero_off && (am) <= am6809_extended_ind)
 #define am6809_indirect_p(am) ((am) == am6809_zero_off_ind || (am) == am6809_const_off8_ind || \
                                (am) == am6809_const_off16_ind || (am) == am6809_acc_off_ind || \
                                (am) == am6809_post_inc2_ind || (am) == am6809_pre_dec2_ind || \
                                (am) == am6809_pcrel8_ind || (am) == am6809_pcrel16_ind || \
                                (am) == am6809_extended_ind)
-
-#define am6502_65c02_only(am) ((am) == am6502_abs_idx_ind || (am) == am6502_zp_ind)
 
 // Global variables
 uint32_t control[BUFFSIZE];           // Recorded control line data
@@ -479,7 +476,7 @@ insn_decode_addrmode_indexed_6809(uint8_t pb)
   addrmode_t am;
 
   // Extended indirect is a slightly special case.
-  if (pb == 0b10011111) {
+  if ((pb & 0b10011111) == 0b10011111) {
     return am6809_extended_ind;
   }
 
