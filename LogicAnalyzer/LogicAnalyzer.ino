@@ -1550,10 +1550,19 @@ void
 insn_decode_init(struct insn_decode *id)
 {
   id->state = ds_idle;
-  if (cpu == cpu_6809 || cpu == cpu_6809e) {
-    id->next_state = insn_decode_next_state_6809;
-  } else {
-    id->next_state = NULL;
+  switch (cpu) {
+    case cpu_6502:
+    case cpu_65c02:
+      id->next_state = insn_decode_next_state_6502;
+      break;
+
+    case cpu_6809:
+    case cpu_6809e:
+      id->next_state = insn_decode_next_state_6809;
+      break;
+
+    default:
+      id->next_state = NULL;
   }
 }
 
