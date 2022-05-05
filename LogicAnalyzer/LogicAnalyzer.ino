@@ -1741,8 +1741,6 @@ list(Stream &stream, int start, int end, int validSamples)
           cycle = "IR";
         } else if (!(control[i] & CC_Z80_IORQ) && !(control[i] & CC_Z80_WR)) {
           cycle = "IW";
-        } else {
-          cycle = " ";
         }
       }
 
@@ -1779,8 +1777,6 @@ list(Stream &stream, int start, int end, int validSamples)
           comment = "IRQ/BRK VECTOR";
         } else if ((address[i] >= 0x0100) && (address[i] <= 0x01ff)) {
           comment = "STACK ACCESS";
-        } else {
-          comment = "";
         }
       }
 
@@ -1800,8 +1796,6 @@ list(Stream &stream, int start, int end, int validSamples)
           comment = "NMI VECTOR";
         } else if (address[i] == 0xfffe) { // Not 0xffff since it commonly occurs when bus is tri-state
           comment = "RESET VECTOR";
-        } else {
-          comment = "";
         }
       }
 
@@ -1829,8 +1823,6 @@ list(Stream &stream, int start, int end, int validSamples)
           comment = "NMI VECTOR";
         } else if (address[i] == 0xfffe) { // Not 0xffff since it commonly occurs when bus is tri-state
           comment = "RESET VECTOR";
-        } else {
-          comment = "";
         }
       }
 
@@ -1840,8 +1832,6 @@ list(Stream &stream, int start, int end, int validSamples)
           comment = "RESET ACTIVE";
         } else if (!(control[i] & CC_Z80_INT)) {
           comment = "INT ACTIVE";
-        } else {
-          comment = "";
         }
       }
 
