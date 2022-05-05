@@ -1819,44 +1819,147 @@ list(Stream &stream, int start, int end)
   }
 }
 
+#define EXPORT_CC(s)  (control[i] & (s)) ? '1' : '0'
+
+const char *
+exportCSV_header_6502(void)
+{
+  return "Index,SYNC,R/W,/RESET,/IRQ,/NMI,Address,Data";
+}
+
+void
+exportCSV_entry_6502(int i, int j, char *output)
+{
+  sprintf(output, "%d,%c,%c,%c,%c,%c,%04lX,%02lX", j,
+      EXPORT_CC(CC_6502_SYNC),
+      EXPORT_CC(CC_6502_RW),
+      EXPORT_CC(CC_6502_RESET),
+      EXPORT_CC(CC_6502_IRQ),
+      EXPORT_CC(CC_6502_NMI),
+      address[i], data[i]);
+}
+
+const char *
+exportCSV_header_6800(void)
+{
+  return "Index,VMA,R/W,/RESET,/IRQ,/NMI,Address,Data";
+}
+
+void
+exportCSV_entry_6800(int i, int j, char *output)
+{
+  sprintf(output, "%d,%c,%c,%c,%c,%c,%04lX,%02lX", j,
+      EXPORT_CC(CC_6800_VMA),
+      EXPORT_CC(CC_6800_RW),
+      EXPORT_CC(CC_6800_RESET),
+      EXPORT_CC(CC_6800_IRQ),
+      EXPORT_CC(CC_6800_NMI),
+      address[i], data[i]);
+}
+
+const char *
+exportCSV_header_6809(void)
+{
+  return "Index,BA,BS,R/W,/RESET,/IRQ,/FIRQ,/NMI,Address,Data";
+}
+
+void
+exportCSV_entry_6809(int i, int j, char *output)
+{
+  sprintf(output, "%d,%c,%c,%c,%c,%c,%c,%c,%04lX,%02lX",j,
+      EXPORT_CC(CC_6809_BA),
+      EXPORT_CC(CC_6809_BS),
+      EXPORT_CC(CC_6809_RW),
+      EXPORT_CC(CC_6809_RESET),
+      EXPORT_CC(CC_6809_IRQ),
+      EXPORT_CC(CC_6809_FIRQ),
+      EXPORT_CC(CC_6809_NMI),
+      address[i], data[i]);
+}
+
+const char *
+exportCSV_header_6809e(void)
+{
+  return "Index,BA,BS,LIC,R/W,/RESET,/IRQ,/FIRQ,/NMI,Address,Data";
+}
+
+void
+exportCSV_entry_6809e(int i, int j, char *output)
+{
+  sprintf(output, "%d,%c,%c,%c,%c,%c,%c,%c,%c,%04lX,%02lX", j,
+      EXPORT_CC(CC_6809_BA),
+      EXPORT_CC(CC_6809_BS),
+      EXPORT_CC(CC_6809E_LIC),
+      EXPORT_CC(CC_6809_RW),
+      EXPORT_CC(CC_6809_RESET),
+      EXPORT_CC(CC_6809_IRQ),
+      EXPORT_CC(CC_6809_FIRQ),
+      EXPORT_CC(CC_6809_NMI),
+      address[i], data[i]);
+}
+
+const char *
+exportCSV_header_z80(void)
+{
+  return "Index,/M1,/RD,/WR,/MREQ,/IORQ,/RESET,/INT,Address,Data";
+}
+
+void
+exportCSV_entry_z80(int i, int j, char *output)
+{
+  sprintf(output, "%d,%c,%c,%c,%c,%c,%c,%c,%04lX,%02lX", j,
+      EXPORT_CC(CC_Z80_M1),
+      EXPORT_CC(CC_Z80_RD),
+      EXPORT_CC(CC_Z80_WR),
+      EXPORT_CC(CC_Z80_MREQ),
+      EXPORT_CC(CC_Z80_IORQ),
+      EXPORT_CC(CC_Z80_RESET),
+      EXPORT_CC(CC_Z80_INT),
+      address[i], data[i]);
+}
+
+#undef EXPORT_CCC
 
 // Show the recorded data in CSV format (e.g. to export to spreadsheet or other program).
 void
 exportCSV(Stream &stream)
 {
-  bool sync;
-  bool rw = false;
-  bool reset = false;
-  bool irq = false;
-  bool firq = false;
-  bool nmi = false;
-  bool vma = false;
-  bool ba = false;
-  bool bs = false;
-  bool lic = false;
-  bool wr = false;
-  bool rd = false;
-  bool iorq = false;
-  bool mreq = false;
-  bool m1 = false;
-  bool intr = false;
+  void (*export_entry)(int, int, char *);
+  const char *header;
+  char output[50];
 
   // Output header
-  if ((cpu == cpu_65c02) || (cpu == cpu_6502)) {
-    stream.println("Index,SYNC,R/W,/RESET,/IRQ,/NMI,Address,Data");
+  switch (cpu) {
+    case cpu_6502:
+    case cpu_65c02:
+      header = exportCSV_header_6502();
+      export_entry = exportCSV_entry_6502;
+      break;
+
+    case cpu_6809:
+      header = exportCSV_header_6809();
+      export_entry = exportCSV_entry_6809;
+      break;
+
+    case cpu_6809e:
+      header = exportCSV_header_6809e();
+      export_entry = exportCSV_entry_6809e;
+      break;
+
+    case cpu_6800:
+      header = exportCSV_header_6800();
+      export_entry = exportCSV_entry_6800;
+      break;
+
+    case cpu_z80:
+      header = exportCSV_header_z80();
+      export_entry = exportCSV_entry_z80;
+      break;
+
+    default:
+      return;
   }
-  if (cpu == cpu_6809) {
-    stream.println("Index,BA,BS,R/W,/RESET,/IRQ,/FIRQ,/NMI,Address,Data");
-  }
-  if (cpu == cpu_6809e) {
-    stream.println("Index,BA,BS,LIC,R/W,/RESET,/IRQ,/FIRQ,/NMI,Address,Data");
-  }
-  if (cpu == cpu_6800) {
-    stream.println("Index,VMA,R/W,/RESET,/IRQ,/NMI,Address,Data");
-  }
-  if (cpu == cpu_z80) {
-    stream.println("Index,/M1,/RD,/WR,/MREQ,/IORQ,/RESET,/INT,Address,Data");
-  }
+  stream.println(header);
 
   int first = (triggerPoint - pretrigger + samples) % samples;
   int last = (triggerPoint - pretrigger + samples - 1) % samples;
@@ -1865,106 +1968,7 @@ exportCSV(Stream &stream)
   int i = first;
   int j = 0;
   while (true) {
-    char output[50]; // Holds output string
-    if ((cpu == cpu_65c02) || (cpu == cpu_6502)) {
-      sync = control[i] & CC_6502_SYNC;
-    }
-    if ((cpu == cpu_65c02) || (cpu == cpu_6502) || (cpu == cpu_6800) || (cpu == cpu_6809) || (cpu == cpu_6809e)) {
-      rw = control[i] & CC_6502_RW;
-      reset = control[i] & CC_6502_RESET;
-      irq = control[i] & CC_6502_IRQ;
-      nmi = control[i] & CC_6502_NMI;
-    }
-    if (cpu == cpu_6800) {
-      vma = control[i] & CC_6800_VMA;
-    }
-    if ((cpu == cpu_6809) || (cpu == cpu_6809e)) {
-      ba = control[i] & CC_6809_BA;
-      bs = control[i] & CC_6809_BS;
-      firq = control[i] & CC_6809_FIRQ;
-    }
-    if (cpu == cpu_6809e) {
-      lic = control[i] & CC_6809E_LIC;
-    }
-    if (cpu == cpu_z80) {
-      wr = control[i] & CC_Z80_WR;
-      rd = control[i] & CC_Z80_RD;
-      iorq = control[i] & CC_Z80_IORQ;
-      mreq = control[i] & CC_Z80_MREQ;
-      m1 = control[i] & CC_Z80_M1;
-      reset = control[i] & CC_Z80_RESET;
-      intr = control[i] & CC_Z80_INT;
-    }
-
-    if ((cpu == cpu_65c02) || (cpu == cpu_6502)) {
-      sprintf(output, "%d,%c,%c,%c,%c,%c,%04lX,%02lX",
-              j,
-              sync ? '1' : '0',
-              rw ? '1' : '0',
-              reset ? '1' : '0',
-              irq ? '1' : '0',
-              nmi ? '1' : '0',
-              address[i],
-              data[i]
-             );
-    }
-    if (cpu == cpu_6800) {
-      sprintf(output, "%d,%c,%c,%c,%c,%c,%04lX,%02lX",
-              j,
-              vma ? '1' : '0',
-              rw ? '1' : '0',
-              reset ? '1' : '0',
-              irq ? '1' : '0',
-              nmi ? '1' : '0',
-              address[i],
-              data[i]
-             );
-    }
-    if (cpu == cpu_6809) {
-      sprintf(output, "%d,%c,%c,%c,%c,%c,%c,%c,%04lX,%02lX",
-              j,
-              ba ? '1' : '0',
-              bs ? '1' : '0',
-              rw ? '1' : '0',
-              reset ? '1' : '0',
-              irq ? '1' : '0',
-              firq ? '1' : '0',
-              nmi ? '1' : '0',
-              address[i],
-              data[i]
-             );
-    }
-    if (cpu == cpu_6809e) {
-      sprintf(output, "%d,%c,%c,%c,%c,%c,%c,%c,%c,%04lX,%02lX",
-              j,
-              ba ? '1' : '0',
-              bs ? '1' : '0',
-              lic ? '1' : '0',
-              rw ? '1' : '0',
-              reset ? '1' : '0',
-              irq ? '1' : '0',
-              firq ? '1' : '0',
-              nmi ? '1' : '0',
-              address[i],
-              data[i]
-             );
-
-    }
-    if (cpu == cpu_z80) {
-      sprintf(output, "%d,%c,%c,%c,%c,%c,%c,%c,%04lX,%02lX",
-              j,
-              m1 ? '1' : '0',
-              rd ? '1' : '0',
-              wr ? '1' : '0',
-              mreq ? '1' : '0',
-              iorq ? '1' : '0',
-              reset ? '1' : '0',
-              intr ? '1' : '0',
-              address[i],
-              data[i]
-             );
-    }
-
+    (*export_entry)(i, j, output);
     stream.println(output);
 
     if (i == last) {
