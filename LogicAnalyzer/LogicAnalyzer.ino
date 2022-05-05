@@ -130,6 +130,7 @@ uint32_t dTriggerMask;                // bitmask of GPIO data bits
 int samples = 20;                     // Total number of samples to record (up to BUFFSIZE)
 int pretrigger = 0;                   // Number of samples to record before trigger (up to samples)
 int triggerPoint = 0;                 // Sample in buffer corresponding to trigger point
+int samplesTaken = 0;                 // Number of samples taken
 cpu_t cpu = cpu_none;                 // Current CPU type
 trigger_t triggerMode = tr_none;      // Type of trigger
 cycle_t triggerCycle = tr_either;     // Trigger on read, write, or either
@@ -1652,7 +1653,7 @@ insn_decode_complete(struct insn_decode *id)
 
 // List recorded data from start to end.
 void
-list(Stream &stream, int start, int end)
+list(Stream &stream, int start, int end, int validSamples)
 {
   char output[80];
 
@@ -1666,7 +1667,7 @@ list(Stream &stream, int start, int end)
   struct insn_decode id;
   insn_decode_init(&id);
 
-  if (cpu == cpu_none) {
+  if (cpu == cpu_none || validSamples == 0) {
     return;
   }
 
@@ -1970,11 +1971,15 @@ exportCSV_entry_z80(int i, int j, char *output)
 
 // Show the recorded data in CSV format (e.g. to export to spreadsheet or other program).
 void
-exportCSV(Stream &stream)
+exportCSV(Stream &stream, int validSamples)
 {
   void (*export_entry)(int, int, char *);
   const char *header;
   char output[50];
+
+  if (validSamples == 0) {
+      return;
+  }
 
   // Output header
   switch (cpu) {
@@ -2040,6 +2045,11 @@ writeSD(void)
     return;
   }
 
+  if (samplesTaken == 0) {
+    Serial.println("No samples to save.");
+    return;
+  }
+
   if (!SD.begin(BUILTIN_SDCARD)) {
     Serial.println("Unable to initialize internal SD card.");
     return;
@@ -2054,7 +2064,7 @@ writeSD(void)
   if (file) {
     Serial.print("Writing ");
     Serial.println(CSV_FILE);
-    exportCSV(file);
+    exportCSV(file, samplesTaken);
     file.close();
   } else {
     Serial.print("Unable to write ");
@@ -2070,7 +2080,7 @@ writeSD(void)
   if (file) {
     Serial.print("Writing ");
     Serial.println(TXT_FILE);
-    list(file, 0, samples - 1);
+    list(file, 0, samples - 1, samplesTaken);
     file.close();
   } else {
     Serial.print("Unable to write ");
@@ -2173,8 +2183,9 @@ go(void)
   digitalWriteFast(CORE_LED0_PIN, HIGH); // Indicates waiting for trigger
 
   int i = 0; // Index into data buffers
-  int samplesTaken = 0; // Number of samples taken
   bool triggered = false; // Set when triggered
+
+  samplesTaken = 0;
 
   while (true) {
 
@@ -2425,7 +2436,7 @@ loop(void) {
 
       // List
     } else if (cmd == "l") {
-      list(Serial, 0, samples - 1);
+      list(Serial, 0, samples - 1, samplesTaken);
     } else if (cmd.startsWith("l ")) {
       if (cmd.indexOf(" ") == cmd.lastIndexOf(" ")) {
         // l <start>
@@ -2435,7 +2446,7 @@ loop(void) {
           Serial.print(samples - 1);
           Serial.println(".");
         } else {
-          list(Serial, start, samples - 1);
+          list(Serial, start, samples - 1, samplesTaken);
         }
 
       } else {
@@ -2453,13 +2464,13 @@ loop(void) {
           Serial.print(samples - 1);
           Serial.println(".");
         } else {
-          list(Serial, start, end);
+          list(Serial, start, end, samplesTaken);
         }
       }
 
       // Export
     } else if (cmd == "e") {
-      exportCSV(Serial);
+      exportCSV(Serial, samplesTaken);
 
       // Write
     } else if (cmd == "w") {
