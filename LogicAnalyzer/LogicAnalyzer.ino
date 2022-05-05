@@ -42,7 +42,7 @@ const char *origVersionString = "Based on Logic Analyzer version 0.30 by Jeff Tr
 // Type definitions
 typedef enum { tr_address, tr_io, tr_data, tr_reset, tr_irq, tr_firq, tr_nmi, tr_none } trigger_t;
 typedef enum { tr_read, tr_write, tr_either } cycle_t;
-typedef enum { cpu_6502, cpu_65c02, cpu_6800, cpu_6809, cpu_6809e, cpu_z80 } cpu_t;
+typedef enum { cpu_none, cpu_6502, cpu_65c02, cpu_6800, cpu_6809, cpu_6809e, cpu_z80 } cpu_t;
 
 // addressing mode types
 typedef enum {
@@ -130,7 +130,7 @@ uint32_t dTriggerMask;                // bitmask of GPIO data bits
 int samples = 20;                     // Total number of samples to record (up to BUFFSIZE)
 int pretrigger = 0;                   // Number of samples to record before trigger (up to samples)
 int triggerPoint = 0;                 // Sample in buffer corresponding to trigger point
-cpu_t cpu = cpu_65c02;                // Current CPU type
+cpu_t cpu = cpu_none;                 // Current CPU type
 trigger_t triggerMode = tr_none;      // Type of trigger
 cycle_t triggerCycle = tr_either;     // Trigger on read, write, or either
 bool triggerLevel = false;            // Trigger level (false=low, true=high);
@@ -1401,7 +1401,6 @@ setup(void)
   Serial.println("Type h or ? for help.");
 }
 
-
 // Interrupt handler for trigger button.
 void
 triggerButton(void)
@@ -1409,35 +1408,50 @@ triggerButton(void)
   triggerPressed = true;
 }
 
-// Display settings and help info.
+const char *
+cpu_name(void)
+{
+  switch (cpu) {
+    case cpu_6502:
+      return "6502";
+      break;
+    case cpu_65c02:
+      return "65C02";
+      break;
+    case cpu_6800:
+      return "6800";
+      break;
+    case cpu_6809:
+      return "6809";
+      break;
+    case cpu_6809e:
+      return "6809E";
+      break;
+    case cpu_z80:
+      return "Z80";
+      break;
+    default:
+      return "not set";
+  }
+}
+
 void
-help(void)
+show_version(void)
 {
   Serial.println(versionString);
   Serial.println(origVersionString);
+}
 
+void
+show_cpu(void)
+{
   Serial.print("CPU: ");
-  switch (cpu) {
-    case cpu_6502:
-      Serial.println("6502");
-      break;
-    case cpu_65c02:
-      Serial.println("65C02");
-      break;
-    case cpu_6800:
-      Serial.println("6800");
-      break;
-    case cpu_6809:
-      Serial.println("6809");
-      break;
-    case cpu_6809e:
-      Serial.println("6809E");
-      break;
-    case cpu_z80:
-      Serial.println("Z80");
-      break;
-  }
+  Serial.println(cpu_name());
+}
 
+void
+show_trigger(void)
+{
   Serial.print("Trigger: ");
   switch (triggerMode) {
     case tr_address:
@@ -1511,15 +1525,44 @@ help(void)
       Serial.println("none (freerun)");
       break;
   }
+}
 
+void
+show_samples(void)
+{
   Serial.print("Sample buffer size: ");
   Serial.println(samples);
+}
+
+void
+show_pretrigger(void)
+{
   Serial.print("Pretrigger samples: ");
   Serial.println(pretrigger);
+}
+
+// Display settings and help info.
+void
+help(void)
+{
+  show_version();
+  show_cpu();
+  show_trigger();
+  show_samples();
+  show_pretrigger();
+
   Serial.println("Commands:");
-  Serial.println("c <cpu>              - Set CPU to 6502, 65C02, 6800, 6809, or Z80");
+  Serial.println("c <cpu>              - Set CPU.  Valid types:");
+  Serial.println("                          6502 65C02");
+  Serial.println("                          6800");
+  Serial.println("                          6809");
+  Serial.println("                          6809E");
+  Serial.println("                          Z80");
+  Serial.println("c                    - Show current CPU");
   Serial.println("s <number>           - Set number of samples");
+  Serial.println("s                    - Show current number of samples");
   Serial.println("p <samples>          - Set pre-trigger samples");
+  Serial.println("p                    - Show current pre-trigger samples");
   Serial.println("t a <address> [r|w]  - Trigger on address");
   if (cpu == cpu_z80) {
     Serial.println("t i <address> [r|w]  - Trigger on i/o address");
@@ -1536,6 +1579,7 @@ help(void)
   }
   Serial.println("t nmi 0|1            - Trigger on /NMI level");
   Serial.println("t none               - Trigger freerun");
+  Serial.println("t                    - Show current trigger");
   Serial.println("g                    - Go/start analyzer");
   Serial.println("l [start] [end]      - List samples");
   Serial.println("e                    - Export samples as CSV");
@@ -1621,6 +1665,10 @@ list(Stream &stream, int start, int end)
 
   struct insn_decode id;
   insn_decode_init(&id);
+
+  if (cpu == cpu_none) {
+    return;
+  }
 
   // Display data
   int i = first;
@@ -1988,6 +2036,10 @@ writeSD(void)
   const char *CSV_FILE = "analyzer.csv";
   const char *TXT_FILE = "analyzer.txt";
 
+  if (cpu == cpu_none) {
+    return;
+  }
+
   if (!SD.begin(BUILTIN_SDCARD)) {
     Serial.println("Unable to initialize internal SD card.");
     return;
@@ -2040,6 +2092,10 @@ go(void)
 
   uint32_t which_c_trigger = 0;
   uint32_t cd_psr_cc_bits;
+
+  if (cpu == cpu_none) {
+    Serial.println("No CPU type selected!");
+  }
   
   // Scramble the trigger address, control, and data lines to match what we will read on the ports.
   if (triggerMode == tr_address) {
@@ -2234,6 +2290,8 @@ loop(void) {
       help();
 
       //CPU
+    } else if (cmd == "c") {
+      show_cpu();
     } else if (cmd == "c 6502") {
       cpu = cpu_6502;
     } else if ((cmd == "c 65c02") || (cmd == "c 65C02")) {
@@ -2248,6 +2306,8 @@ loop(void) {
       cpu = cpu_z80;
 
       // Samples
+    } else if (cmd == "s") {
+      show_samples();
     } else if (cmd.startsWith("s ")) {
       int n = 0;
       n = cmd.substring(2).toInt();
@@ -2264,6 +2324,8 @@ loop(void) {
       }
 
       // Pretrigger
+    } else if (cmd == "p") {
+      show_pretrigger();
     } else if (cmd.startsWith("p ")) {
       int n = 0;
       n = cmd.substring(2).toInt();
@@ -2277,6 +2339,8 @@ loop(void) {
       }
 
       // Trigger
+    } else if (cmd == "t") {
+      show_trigger();
     } else if (cmd == "t none") {
       triggerMode = tr_none;
     } else if (cmd == "t reset 0") {
