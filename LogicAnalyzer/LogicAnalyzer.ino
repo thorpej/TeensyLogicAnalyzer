@@ -1201,6 +1201,292 @@ insn_decode_next_state_6809(struct insn_decode *id)
 
 #define CC_Z80_CLK_PIN    CC0_PIN
 
+//
+// FAKE SAMPLE DATA FOR DEBUGGING PURPOSES.  You can only enable
+// one of these at a time.
+//
+#ifdef DEBUG_6502
+#endif // DEBUG_6502
+
+#ifdef DEBUG_6809
+#endif // DEBUG_6809
+
+// #define DEBUG_6809E
+#ifdef DEBUG_6809E
+#define DEBUG_CPU   cpu_6809e
+
+// Main goal of the 6809E debug data is to exercise the instruction decoder.
+// Most of these samples are not cycle-accurate in any way, shape, or form.
+const uint32_t debug_data[] = {
+  // Dummy sample, just to set LIC
+  0,
+
+  // Inherent addressing mode: NEGA
+  0x40,
+
+  // Direct addressing mode: INC < $10
+  0x0c, 0x10,
+
+  // Relative addressing mode: BRA -3
+  0x20, 0xfd,
+
+  // Extended addressing mode: ASR $CAFE
+  0x77, 0xca, 0xfe,
+
+  // Immediate addressing mode: ORA #$5A
+  0x8a, 0x5a,
+
+  // Indexed zero-offset: LEAX ,X
+  0x30, 0b10000100,
+
+  // Indexed zero-offset indirect: LEAX [,X]
+  0x30, 0b10010100,
+
+  // Indexed 5-bit constant offset: LEAY 1,Y
+  0x31, 0b00100001,
+
+  // Indexed 8-bit constant offset: LEAS -64,S
+  0x32, 0b11101000, 0xc0,
+
+  // Indexed 8-bit constant offset indirect: LEAU [-64,U]
+  0x32, 0b11111000, 0xc0,
+
+  // Indexed 16-bit constant offset: SUBA 384,Y
+  0xa0, 0b10101001, 0x01, 0x80,
+
+  // Indexed 16-bit constant offset indirect: LDA [1024,X]
+  0xa6, 0b10011001, 0x04, 0x00,
+
+  // Indexed accumulator offset: STA A,U
+  0xa7, 0b10100110,
+
+  // Indexed accumulator offset indirect: STA [A,U]
+  0xa7, 0b10110110,
+
+  // Indexed accumulator offset: ORA B,Y
+  0xaa, 0b10100101,
+
+  // Indexed accumulator offset: CMPX D,S
+  0xac, 0b11101011,
+
+  // Indexed Auto Increment by 1: LDA ,X+
+  0xa6, 0b10000000,
+
+  // Indexed Auto Increment by 2: LDY ,X++
+  0x10, 0xa3, 0b10000001,
+
+  // Indexed Auto Increment by 2 indirect: LDY [,X++]
+  0x10, 0xa3, 0b10010001,
+
+  // Indexed Auto Decrement by 1: LDA ,-X
+  0xa6, 0b10000010,
+
+  // Indexed Auto Decrement by 2: LDY ,--X
+  0x10, 0xa3, 0b10000011,
+
+  // Indexed Auto Decrement by 2 indirect: LDY [,--X]
+  0x10, 0xa3, 0b10010011,
+
+  // Indexed constant 8-bit offset from PC: LDB 10,PCR
+  0xe6, 0b10001100, 0x0a,
+
+  // Indexed constant 8-bit offset from PC indirect: LDB [10,PCR]
+  0xe6, 0b10011100, 0x0a,
+
+  // Indexed constant 16-bit offset from PC: LDB 32767,PCR
+  0xe6, 0b10001101, 0x7f, 0xff,
+
+  // Indexed constant 16-bit offset from PC indirect: LDB 32767,PCR
+  0xe6, 0b10011101, 0x7f, 0xff,
+
+  // Extended indirect addressing mode: BITA [$CAFE]
+  0xa5, 0b10011111, 0xca, 0xfe,
+};
+
+const uint32_t debug_address[] = {
+  // Dummy sample, just to set LIC
+  0,
+
+  // Inherent addressing mode: NEGA
+  0x1000,
+
+  // Direct addressing mode: INC < $10
+  0x1001, 0x1002,
+
+  // Relative addressing mode: BRA -3
+  0x1003, 0x1004,
+
+  // Extended addressing mode: ASR $CAFE
+  0x1005, 0x1006, 0x1007,
+
+  // Immediate addressing mode: ORA #$5A
+  0x1008, 0x1009,
+
+  // Indexed zero-offset: LEAX ,X
+  0x100a, 0x100b,
+
+  // Indexed zero-offset indirect: LEAX [,X]
+  0x100c, 0x100d,
+
+  // Indexed 5-bit constant offset: LEAY 1,Y
+  0x100e, 0x100f,
+
+  // Indexed 8-bit constant offset: LEAS -64,S
+  0x1010, 0x1011, 0x1012,
+
+  // Indexed 8-bit constant offset indirect: LEAU [-64,U]
+  0x1013, 0x1014, 0x1015,
+
+  // Indexed 16-bit constant offset: SUBA 384,Y
+  0x1016, 0x1017, 0x1018, 0x1019,
+
+  // Indexed 16-bit constant offset indirect: LDA [1024,X]
+  0x101a, 0x101b, 0x101c, 0x101d,
+
+  // Indexed accumulator offset: STA A,U
+  0x101e, 0x101f,
+
+  // Indexed accumulator offset indirect: STA [A,U]
+  0x1020, 0x1021,
+
+  // Indexed accumulator offset: ORA B,Y
+  0x1022, 0x1023,
+
+  // Indexed accumulator offset: CMPX D,S
+  0x1024, 0x1025,
+
+  // Indexed Auto Increment by 1: LDA ,X+
+  0x1026, 0x1027,
+
+  // Indexed Auto Increment by 2: LDY ,X++
+  0x1028, 0x1029, 0x102a,
+
+  // Indexed Auto Increment by 2 indirect: LDY [,X++]
+  0x102b, 0x102c, 0x102d,
+
+  // Indexed Auto Decrement by 1: LDA ,-X
+  0x102e, 0x102f,
+
+  // Indexed Auto Decrement by 2: LDY ,--X
+  0x1030, 0x1031, 0x1032,
+
+  // Indexed Auto Decrement by 2 indirect: LDY [,--X]
+  0x1033, 0x1034, 0x1035,
+
+  // Indexed constant 8-bit offset from PC: LDB 10,PCR
+  0x1036, 0x1037, 0x1038,
+
+  // Indexed constant 8-bit offset from PC indirect: LDB [10,PCR]
+  0x1039, 0x103a, 0x103b,
+
+  // Indexed constant 16-bit offset from PC: LDB 32767,PCR
+  0x103c, 0x103d, 0x103e, 0x103f,
+
+  // Indexed constant 16-bit offset from PC indirect: LDB 32767,PCR
+  0x1040, 0x1041, 0x1042, 0x1043,
+
+  // Extended indirect addressing mode: BITA [$CAFE]
+  0x1044, 0x1045, 0x1047, 0x1048,
+};
+
+const uint32_t debug_control[] = {
+  // Dummy sample, just to set LIC
+  CC_6809E_LIC,
+
+  // Inherent addressing mode: NEGA
+  CC_6809E_LIC,
+
+  // Direct addressing mode: INC < $10
+  0, CC_6809E_LIC,
+
+  // Relative addressing mode: BRA -3
+  0, CC_6809E_LIC,
+
+  // Extended addressing mode: ASR $CAFE
+  0, 0, CC_6809E_LIC,
+
+  // Immediate addressing mode: ORA #$5A
+  0, CC_6809E_LIC,
+
+  // Indexed zero-offset: LEAX ,X
+  0, CC_6809E_LIC,
+
+  // Indexed zero-offset indirect: LEAX [,X]
+  0, CC_6809E_LIC,
+
+  // Indexed 5-bit constant offset: LEAY 1,Y
+  0, CC_6809E_LIC,
+
+  // Indexed 8-bit constant offset: LEAS -64,S
+  0, 0, CC_6809E_LIC,
+
+  // Indexed 8-bit constant offset indirect: LEAU [-64,U]
+  0, 0, CC_6809E_LIC,
+
+  // Indexed 16-bit constant offset: SUBA 384,Y
+  0, 0, 0, CC_6809E_LIC,
+
+  // Indexed 16-bit constant offset indirect: LDA [1024,X]
+  0, 0, 0, CC_6809E_LIC,
+
+  // Indexed accumulator offset: STA A,U
+  0, CC_6809E_LIC,
+
+  // Indexed accumulator offset indirect: STA [A,U]
+  0, CC_6809E_LIC,
+
+  // Indexed accumulator offset: ORA B,Y
+  0, CC_6809E_LIC,
+
+  // Indexed accumulator offset: CMPX D,S
+  0, CC_6809E_LIC,
+
+  // Indexed Auto Increment by 1: LDA ,X+
+  0, CC_6809E_LIC,
+
+  // Indexed Auto Increment by 2: LDY ,X++
+  0, 0, CC_6809E_LIC,
+
+  // Indexed Auto Increment by 2 indirect: LDY [,X++]
+  0, 0, CC_6809E_LIC,
+
+  // Indexed Auto Decrement by 1: LDA ,-X
+  0, CC_6809E_LIC,
+
+  // Indexed Auto Decrement by 2: LDY ,--X
+  0, 0, CC_6809E_LIC,
+
+  // Indexed Auto Decrement by 2 indirect: LDY [,--X]
+  0, 0, CC_6809E_LIC,
+
+  // Indexed constant 8-bit offset from PC: LDB 10,PCR
+  0, 0, CC_6809E_LIC,
+
+  // Indexed constant 8-bit offset from PC indirect: LDB [10,PCR]
+  0, 0, CC_6809E_LIC,
+
+  // Indexed constant 16-bit offset from PC: LDB 32767,PCR
+  0, 0, 0, CC_6809E_LIC,
+
+  // Indexed constant 16-bit offset from PC indirect: LDB 32767,PCR
+  0, 0, 0, CC_6809E_LIC,
+
+  // Extended indirect addressing mode: BITA [$CAFE]
+  0, 0, 0, CC_6809E_LIC,
+};
+#endif // DEBUG_6809E
+
+#ifdef DEBUG_6800
+#endif // DEBUG_6800
+
+#ifdef DEBUG_Z80
+#endif // DEBUG_Z80
+
+#if defined(DEBUG_6502) || defined(DEBUG_6809) || defined(DEBUG_6809E) || \
+    defined(DEBUG_6800) || defined(DEBUG_Z80)
+#define DEBUG_SAMPLES
+#endif
+
 // Macros
 #define WAIT_PHI2_LOW while (digitalReadFast(CC_6502_PHI2_PIN) == HIGH) ;
 #define WAIT_PHI2_HIGH while (digitalReadFast(CC_6502_PHI2_PIN) == LOW) ;
@@ -1584,6 +1870,9 @@ help(void)
   Serial.println("l [start] [end]      - List samples");
   Serial.println("e                    - Export samples as CSV");
   Serial.println("w                    - Write data to SD card");
+#ifdef DEBUG_SAMPLES
+  Serial.println("D                    - Load debug sample data");
+#endif
   Serial.println("h or ?               - Show command usage");
 }
 
@@ -2465,8 +2754,17 @@ loop(void) {
     } else if (cmd == "w") {
       writeSD();
 
-      // Invalid command
+#ifdef DEBUG_SAMPLES
+      // Load debug sample data
+    } else if (cmd == "D") {
+      samples = samplesTaken = sizeof(debug_data) / sizeof(debug_data[0]);
+      cpu = DEBUG_CPU;
+      memcpy(data, debug_data, sizeof(debug_data));
+      memcpy(address, debug_address, sizeof(debug_address));
+      memcpy(control, debug_control, sizeof(debug_control));
+#endif
     } else {
+      // Invalid command
       if (cmd != "") {
         Serial.print("Invalid command: '");
         Serial.print(cmd);
