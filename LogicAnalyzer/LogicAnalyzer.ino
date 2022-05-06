@@ -1205,7 +1205,54 @@ insn_decode_next_state_6809(struct insn_decode *id)
 // FAKE SAMPLE DATA FOR DEBUGGING PURPOSES.  You can only enable
 // one of these at a time.
 //
+
+// #define DEBUG_6502
 #ifdef DEBUG_6502
+#define DEBUG_CPU   cpu_6502
+// Main goal of the 6502 debug data is to exercise the instruction decoder.
+// Because of the simplicity of the 6502 addressing modes, we only need to
+// exercise a handful of real addressing modes.
+const uint32_t debug_data[] = {
+  // BRK
+  0x00,
+
+  // ORA $20
+  0x05, 0x20,
+
+  // LDY $3000
+  0xac, 0x00, 0x30,
+
+  // BPL 16
+  0x10, 0x10,
+};
+
+const uint32_t debug_address[] = {
+  // BRK
+  0x1000,
+
+  // ORA $20
+  0x1001, 0x1002,
+
+  // LDY $3000
+  0x1003, 0x1004, 0x1005,
+
+  // BPL 16
+  0x1006, 0x1007,
+};
+
+const uint32_t debug_control[] = {
+  // BRK
+  CC_6502_SYNC,
+
+  // ORA $20
+  CC_6502_SYNC, 0,
+
+  // LDY $3000
+  CC_6502_SYNC, 0, 0,
+
+  // BPL 16
+  CC_6502_SYNC, 0,
+};
 #endif // DEBUG_6502
 
 #ifdef DEBUG_6809
