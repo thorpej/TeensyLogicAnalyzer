@@ -847,7 +847,7 @@ insn_decode_format_6809(struct insn_decode *id)
       break;
 
     case am6809_const_off5:
-      s16 = id->bytes[i];
+      s16 = id->bytes[i] & 0x1f;
       s16 = (s16 << 11) >> 11;    // sign-extend and discard extra bits
       goto const_off;
 
