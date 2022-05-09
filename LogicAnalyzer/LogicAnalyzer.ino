@@ -1352,6 +1352,18 @@ const uint32_t debug_data[] = {
 
   // Extended indirect addressing mode: BITA [$CAFE]
   0xa5, 0b10011111, 0xca, 0xfe,
+
+  // TFR D,U
+  0x1f, (0b0000 << 4) | 0b0011,
+
+  // EXG X,DPR
+  0x1e, (0b0001 << 4) | 0b1011,
+
+  // PSHS A,B,U
+  0x34, 0b01000110,
+
+  // PULU S
+  0x37, 0b01000000,
 };
 
 const uint32_t debug_address[] = {
@@ -1438,6 +1450,19 @@ const uint32_t debug_address[] = {
 
   // Extended indirect addressing mode: BITA [$CAFE]
   0x1044, 0x1045, 0x1047, 0x1048,
+
+  // TFR D,U
+  0x1049, 0x1050,
+
+  // EXG X,DPR
+  0x1051, 0x1052,
+
+  // PSHS A,B,U
+  0x1053, 0x1054,
+
+  // PULU S
+  0x1055, 0x1056,
+
 };
 
 #define N   (CC_6809_RW | CC_6809_IRQ | CC_6809_FIRQ | CC_6809_NMI | CC_6809_RESET)
@@ -1526,6 +1551,18 @@ const uint32_t debug_control[] = {
 
   // Extended indirect addressing mode: BITA [$CAFE]
   N, N, N, CC_6809E_LIC | N,
+
+  // TFR D,U
+  N, CC_6809E_LIC | N,
+
+  // EXG X,DPR
+  N, CC_6809E_LIC | N,
+
+  // PSHS A,B,U
+  N, CC_6809E_LIC | N,
+
+  // PULU S
+  N, CC_6809E_LIC | N,
 };
 
 #undef N
