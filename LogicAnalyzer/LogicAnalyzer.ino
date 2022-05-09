@@ -867,7 +867,7 @@ insn_decode_format_6809(struct insn_decode *id)
     case am6809_acc_off:
     case am6809_acc_off_ind:
       switch (id->bytes[i] & 0b1111) {
-        case 0b0100: cp1 = "A"; break;
+        case 0b0110: cp1 = "A"; break;
         case 0b0101: cp1 = "B"; break;
         case 0b1011: cp1 = "D"; break;
         default:     cp1 = "?"; break;
@@ -1309,10 +1309,10 @@ const uint32_t debug_data[] = {
   0xa6, 0b10011001, 0x04, 0x00,
 
   // Indexed accumulator offset: STA A,U
-  0xa7, 0b10100110,
+  0xa7, 0b11000110,
 
   // Indexed accumulator offset indirect: STA [A,U]
-  0xa7, 0b10110110,
+  0xa7, 0b11010110,
 
   // Indexed accumulator offset: ORA B,Y
   0xaa, 0b10100101,
