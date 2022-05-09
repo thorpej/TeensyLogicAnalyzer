@@ -971,7 +971,7 @@ insn_decode_next_state_6809(struct insn_decode *id)
 
     // We now can try to determine the addressing mode.  It might take
     // multiple passes, since extended opcodes can have indexed modes,
-    // and that would require fetching a third byte.  Once we have  the
+    // and that would require fetching a third byte.  Once we have the
     // addressing mode, we'll know the total number of bytes that will
     // be required to fully decode the instruction.
     id->addrmode = insn_decode_addrmode_6809(id);
