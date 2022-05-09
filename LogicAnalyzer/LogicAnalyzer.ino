@@ -1364,6 +1364,12 @@ const uint32_t debug_data[] = {
 
   // PULU S
   0x37, 0b01000000,
+
+  // Dummy IRQ vector
+  0xc0, 0x00,
+
+  // Dummy IRQ handler (NOP)
+  0x12,
 };
 
 const uint32_t debug_address[] = {
@@ -1463,6 +1469,11 @@ const uint32_t debug_address[] = {
   // PULU S
   0x1055, 0x1056,
 
+  // Dummy IRQ vector
+  0xfff8, 0xfff9,
+
+  // Dummy IRQ handler (NOP)
+  0xc000,
 };
 
 #define N   (CC_6809_RW | CC_6809_IRQ | CC_6809_FIRQ | CC_6809_NMI | CC_6809_RESET)
@@ -1563,6 +1574,12 @@ const uint32_t debug_control[] = {
 
   // PULU S
   N, CC_6809E_LIC | N,
+
+  // Dummy IRQ vector
+  N & ~CC_6809_IRQ, N & ~CC_6809_IRQ,
+
+  // Dummy IRQ handler (NOP)
+  (N & ~CC_6809_IRQ) | CC_6809E_LIC,
 };
 
 #undef N
@@ -2054,13 +2071,15 @@ void
 list(Stream &stream, int start, int end, int validSamples)
 {
   char output[80];
+  char comment[30], *cp;
 
   int first = (triggerPoint - pretrigger + samples) % samples;
   int last = (triggerPoint - pretrigger + samples - 1) % samples;
 
   bool seen_lic = false;
 
-  const char *cycle, *comment;
+  const char *cycle, *trig;
+  const char *comma;
 
   struct insn_decode id;
   insn_decode_init(&id);
@@ -2074,7 +2093,10 @@ list(Stream &stream, int start, int end, int validSamples)
   int j = 0;
   while (true) {
     cycle = "";
-    comment = "";
+    trig = "";
+    comma = "";
+    comment[0] = '\0';
+    cp = comment;
 
     if ((j >= start) && (j <= end)) {
 
@@ -2100,9 +2122,10 @@ list(Stream &stream, int start, int end, int validSamples)
           cycle = "-";
         } else if (control[i] & CC_6809_RW) {
           // On 6809E, if we saw LIC on the previous cycle, then
-          // this is an insn fetch.
+          // this is an insn fetch.  Don't try to decode an instruction
+          // if it looks like we're doing a vector fetch, though.
           cycle = "R";
-          if (cpu == cpu_6809e) {
+          if (cpu == cpu_6809e && address[i] < 0xfff2) {
             if (seen_lic) {
               cycle = "F";
               insn_decode_begin(&id, address[i], data[i]);
@@ -2159,91 +2182,106 @@ list(Stream &stream, int start, int end, int validSamples)
         }
       }
 
+#define COMMENT(str) do { cp += sprintf(cp, "%s%s", comma, str); comma = ","; } while (0)
+
       // Check for 6502 /RESET, /IRQ, or /NMI active, vector address, or
       // stack access
       if ((cpu == cpu_65c02) || (cpu == cpu_6502)) {
         if (!(control[i] & CC_6502_RESET)) {
-          comment = "RESET ACTIVE";
-        } else if (!(control[i] & CC_6502_IRQ)) {
-          comment = "IRQ ACTIVE";
-        } else if (!(control[i] & CC_6502_NMI)) {
-          comment = "NMI ACTIVE";
-        } else if ((address[i] == 0xfffa) || (address[i] == 0xfffb)) {
-          comment = "NMI VECTOR";
+          COMMENT("RESET");
+        }
+        if (!(control[i] & CC_6502_IRQ)) {
+          COMMENT("IRQ");
+        }
+        if (!(control[i] & CC_6502_NMI)) {
+          COMMENT("NMI");
+        }
+        if ((address[i] == 0xfffa) || (address[i] == 0xfffb)) {
+          COMMENT("NMI VECTOR");
         } else if ((address[i] == 0xfffc) || (address[i] == 0xfffd)) {
-          comment = "RESET VECTOR";
+          COMMENT("RESET VECTOR");
         } else if ((address[i] == 0xfffe) || (address[i] == 0xffff)) {
-          comment = "IRQ/BRK VECTOR";
+          COMMENT("IRQ/BRK VECTOR");
         } else if ((address[i] >= 0x0100) && (address[i] <= 0x01ff)) {
-          comment = "STACK ACCESS";
+          COMMENT("STACK ACCESS");
         }
       }
 
       // Check for 6800 /RESET, /IRQ, or /NMI active, vector address.
       if (cpu == cpu_6800) {
         if (!(control[i] & CC_6800_RESET)) {
-          comment = "RESET ACTIVE";
-        } else if (!(control[i] & CC_6800_IRQ)) {
-          comment = "IRQ ACTIVE";
-        } else if (!(control[i] & CC_6800_NMI)) {
-          comment = "NMI ACTIVE";
-        } else if ((address[i] == 0xfff8) || (address[i] == 0xfff8)) {
-          comment = "IRQ VECTOR";
+          COMMENT("RESET");
+        }
+        if (!(control[i] & CC_6800_IRQ)) {
+          COMMENT("IRQ");
+        }
+        if (!(control[i] & CC_6800_NMI)) {
+          COMMENT("NMI");
+        }
+        if ((address[i] == 0xfff8) || (address[i] == 0xfff8)) {
+          COMMENT("IRQ VECTOR");
         } else if ((address[i] == 0xfffa) || (address[i] == 0xfffb)) {
-          comment = "SWI VECTOR";
+          COMMENT("SWI VECTOR");
         } else if ((address[i] == 0xfffc) || (address[i] == 0xfffd)) {
-          comment = "NMI VECTOR";
+          COMMENT("NMI VECTOR");
         } else if (address[i] == 0xfffe) { // Not 0xffff since it commonly occurs when bus is tri-state
-          comment = "RESET VECTOR";
+          COMMENT("RESET VECTOR");
         }
       }
 
       // Check for 6809 /RESET, /IRQ, or /NMI active, vector address.
       if (cpu == cpu_6809 || cpu == cpu_6809e) {
         if (!(control[i] & CC_6809_RESET)) {
-          comment = "RESET ACTIVE";
-        } else if (!(control[i] & CC_6809_IRQ)) {
-          comment = "IRQ ACTIVE";
-        } else if (!(control[i] & CC_6809_FIRQ)) {
-          comment = "FIRQ ACTIVE";
-        } else if (!(control[i] & CC_6809_NMI)) {
-          comment = "NMI ACTIVE";
-        } else if ((address[i] == 0xfff2) || (address[i] == 0xfff3)) {
-          comment = "SWI3 VECTOR";
+          COMMENT("RESET");
+        }
+        if (!(control[i] & CC_6809_IRQ)) {
+          COMMENT("IRQ");
+        }
+        if (!(control[i] & CC_6809_FIRQ)) {
+          COMMENT("FIRQ");
+        }
+        if (!(control[i] & CC_6809_NMI)) {
+          COMMENT("NMI");
+        }
+        if ((address[i] == 0xfff2) || (address[i] == 0xfff3)) {
+          COMMENT("SWI3 VECTOR");
         } else if ((address[i] == 0xfff4) || (address[i] == 0xfff5)) {
-          comment = "SWI2 VECTOR";
+          COMMENT("SWI2 VECTOR");
         } else if ((address[i] == 0xfff6) || (address[i] == 0xfff7)) {
-          comment = "FIRQ VECTOR";
-        } else if ((address[i] == 0xfff8) || (address[i] == 0xfff8)) {
-          comment = "IRQ VECTOR";
+          COMMENT("FIRQ VECTOR");
+        } else if ((address[i] == 0xfff8) || (address[i] == 0xfff9)) {
+          COMMENT("IRQ VECTOR");
         } else if ((address[i] == 0xfffa) || (address[i] == 0xfffb)) {
-          comment = "SWI VECTOR";
+          COMMENT("SWI VECTOR");
         } else if ((address[i] == 0xfffc) || (address[i] == 0xfffd)) {
-          comment = "NMI VECTOR";
+          COMMENT("NMI VECTOR");
         } else if (address[i] == 0xfffe) { // Not 0xffff since it commonly occurs when bus is tri-state
-          comment = "RESET VECTOR";
+          COMMENT("RESET VECTOR");
         }
       }
 
       // Check for Z80 /RESET or /INT active
       if (cpu == cpu_z80) {
         if (!(control[i] & CC_Z80_RESET)) {
-          comment = "RESET ACTIVE";
-        } else if (!(control[i] & CC_Z80_INT)) {
-          comment = "INT ACTIVE";
+          COMMENT("RESET");
+        }
+        if (!(control[i] & CC_Z80_INT)) {
+          COMMENT("INT");
         }
       }
 
+#undef COMMENT
+
       // Indicate when trigger happened
       if (i == triggerPoint) {
-        comment = "<--- TRIGGER ----";
+        trig = "<--";
       }
 
       // This printf format needs to be kept in sync with INSN_DECODE_MAXSTRING.
       sprintf(output,
-          "%04lX  %-2s  %02lX  %-28s  %s",
+          "%04lX  %-2s  %02lX  %-28s  %-3s  %s",
           address[i], cycle, data[i], insn_decode_complete(&id),
-          comment);
+          trig, comment);
 
       stream.println(output);
     }
