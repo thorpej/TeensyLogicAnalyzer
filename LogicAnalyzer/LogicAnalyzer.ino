@@ -1300,7 +1300,7 @@ const uint32_t debug_data[] = {
   0x32, 0b11101000, 0xc0,
 
   // Indexed 8-bit constant offset indirect: LEAU [-64,U]
-  0x32, 0b11111000, 0xc0,
+  0x33, 0b11011000, 0xc0,
 
   // Indexed 16-bit constant offset: SUBA 384,Y
   0xa0, 0b10101001, 0x01, 0x80,
@@ -1324,19 +1324,19 @@ const uint32_t debug_data[] = {
   0xa6, 0b10000000,
 
   // Indexed Auto Increment by 2: LDY ,X++
-  0x10, 0xa3, 0b10000001,
+  0x10, 0xae, 0b10000001,
 
   // Indexed Auto Increment by 2 indirect: LDY [,X++]
-  0x10, 0xa3, 0b10010001,
+  0x10, 0xae, 0b10010001,
 
   // Indexed Auto Decrement by 1: LDA ,-X
   0xa6, 0b10000010,
 
   // Indexed Auto Decrement by 2: LDY ,--X
-  0x10, 0xa3, 0b10000011,
+  0x10, 0xae, 0b10000011,
 
   // Indexed Auto Decrement by 2 indirect: LDY [,--X]
-  0x10, 0xa3, 0b10010011,
+  0x10, 0xae, 0b10010011,
 
   // Indexed constant 8-bit offset from PC: LDB 10,PCR
   0xe6, 0b10001100, 0x0a,
