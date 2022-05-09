@@ -1970,7 +1970,9 @@ insn_decode_begin(struct insn_decode *id, uint32_t addr, uint8_t b)
 bool
 insn_decode_continue(struct insn_decode *id, uint8_t b)
 {
-  if (id->state == ds_fetching) {
+  decode_state_t ostate;
+
+  if ((ostate = id->state) == ds_fetching) {
     if (id->bytes_fetched == INSN_DECODE_MAXBYTES) {
       strcpy(id->insn_string, "<decode overflow>");
       id->state = ds_complete;
@@ -1981,7 +1983,7 @@ insn_decode_continue(struct insn_decode *id, uint8_t b)
       }
     }
   }
-  return id->state == ds_fetching;
+  return ostate == ds_fetching;
 }
 
 const char *
@@ -2030,8 +2032,7 @@ list(Stream &stream, int start, int end, int validSamples)
           insn_decode_begin(&id, address[i], data[i]);
           cycle = "F";
         } else if (control[i] & CC_6502_RW) {
-          insn_decode_continue(&id, data[i]);
-          cycle = "R";
+          cycle = insn_decode_continue(&id, data[i]) ? "*" : "R";
         } else {
           cycle = "W";
         }
@@ -2054,7 +2055,9 @@ list(Stream &stream, int start, int end, int validSamples)
               insn_decode_begin(&id, address[i], data[i]);
               seen_lic = false;
             } else {
-              insn_decode_continue(&id, data[i]);
+              if (insn_decode_continue(&id, data[i])) {
+                cycle = "*";
+              }
             }
           }
         } else {
@@ -2077,8 +2080,7 @@ list(Stream &stream, int start, int end, int validSamples)
           cycle = "F";
           insn_decode_begin(&id, address[i], data[i]);
         } else if (!(control[i] & CC_Z80_MREQ) && !(control[i] & CC_Z80_RD)) {
-          cycle = "R";
-          insn_decode_continue(&id, data[i]);
+          cycle = insn_decode_continue(&id, data[i]) ? "*" : "R";
         } else if (!(control[i] & CC_Z80_MREQ) && !(control[i] & CC_Z80_WR)) {
           cycle = "W";
         } else if (!(control[i] & CC_Z80_IORQ) && !(control[i] & CC_Z80_RD)) {
