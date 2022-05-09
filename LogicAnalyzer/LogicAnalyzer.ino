@@ -155,7 +155,7 @@ read_s16le(const uint8_t *buf, int i)
 uint16_t
 read_u16be(const uint8_t *buf, int i)
 {
-  return (buf[i] << 8) | buf[i + i];
+  return (buf[i] << 8) | buf[i + 1];
 }
 
 int16_t
@@ -207,70 +207,70 @@ struct insn_decode {
 const char *opcodes_65c02[256] = {
   "BRK",       "ORA ($nn,X)", "?",         "?",   "TSB $nn",     "ORA $nn",     "ASL $nn",     "RMB0 $nn",
   "PHP",       "ORA #$nn",    "ASLA",      "?",   "TSB XXXX",    "ORA $nnnn",   "ASL $nnnn",   "BBR0 $nn",
-  "BPL rr",    "ORA ($nn),Y", "ORA ($nn)", "?",   "TRB $nn",     "ORA $nn,X",   "ASL $nn,X",   "RMB1 $nn",
+  "BPL rrrr",  "ORA ($nn),Y", "ORA ($nn)", "?",   "TRB $nn",     "ORA $nn,X",   "ASL $nn,X",   "RMB1 $nn",
   "CLC",       "ORA $nnnn,Y", "INCA",      "?",   "TRB $nn",     "ORA $nnnn,X", "ASL $nnnn,X", "BBR1 $nn",
   "JSR $nnnn", "AND ($nn,X)", "?",         "?",   "BIT $nn",     "AND $nn",     "ROL $nn",     "RMB2 $nn",
   "PLP",       "AND #$nn",    "ROLA",      "?",   "BIT $nnnn",   "AND $nnnn",   "ROL $nnnn",   "BBR2 $nn",
-  "BMI rr",    "AND ($nn),Y", "AND ($nn)", "?",   "BIT $nn,X",   "AND $nn,X",   "ROL $nn,X",   "RMB3 $nn",
+  "BMI rrrr",  "AND ($nn),Y", "AND ($nn)", "?",   "BIT $nn,X",   "AND $nn,X",   "ROL $nn,X",   "RMB3 $nn",
   "SEC",       "AND $nnnn,Y", "DECA",      "?",   "BIT $nn,X",   "AND $nnnn,X", "ROL $nnnn,X", "BBR3 $nn",
   "RTI",       "EOR ($nn,X)", "?",         "?",   "?",           "EOR $nn",     "LSR $nn",     "RMB4 $nn",
   "PHA",       "EOR #$nn",    "LSRA",      "?",   "JMP $nnnn",   "EOR $nnnn",   "LSR $nnnn",   "BBR4 $nn",
-  "BVC rr",    "EOR ($nn),Y", "EOR ($nn)", "?",   "?",           "EOR $nn,X",   "LSR $nn,X",   "RMB5 $nn",
+  "BVC rrrr",  "EOR ($nn),Y", "EOR ($nn)", "?",   "?",           "EOR $nn,X",   "LSR $nn,X",   "RMB5 $nn",
   "CLI",       "EOR $nnnn,Y", "PHY",       "?",   "?",           "EOR $nnnn,X", "LSR $nnnn,X", "BBR5 $nn",
   "RTS",       "ADC ($nn,X)", "?",         "?",   "STZ $nn",     "ADC $nn",     "ROR $nn",     "RMB6 $nn",
   "PLA",       "ADC #$nn",    "RORA",      "?",   "JMP ($nnnn)", "ADC $nnnn",   "ROR $nnnn",   "BBR6 $nn",
-  "BVS rr",    "ADC ($nn),Y", "ADC ($nn)", "?",   "STZ $nn,X",   "ADC $nn,X",   "ROR $nn,X",   "RMB7 $nn",
+  "BVS rrrr",  "ADC ($nn),Y", "ADC ($nn)", "?",   "STZ $nn,X",   "ADC $nn,X",   "ROR $nn,X",   "RMB7 $nn",
   "SEI",       "ADC $nnnn,Y", "PLY",       "?",   "JMP ($nn,X)", "ADC $nnnn,X", "ROR $nnnn,X", "BBR7 $nn",
-  "BRA rr",    "STA ($nn,X)", "?",         "?",   "STY $nn",     "STA $nn",     "STX $nn",     "SMB0 $nn",
+  "BRA rrrr",  "STA ($nn,X)", "?",         "?",   "STY $nn",     "STA $nn",     "STX $nn",     "SMB0 $nn",
   "DEY",       "BIT #$nn",    "TXA",       "?",   "STY $nnnn",   "STA $nnnn",   "STX $nnnn",   "BBS0 $nn",
-  "BCC rr",    "STA ($nn),Y", "STA ($nn)", "?",   "STY $nn,X",   "STA $nn,X",   "STX ($nn),Y", "SMB1 $nn",
+  "BCC rrrr",  "STA ($nn),Y", "STA ($nn)", "?",   "STY $nn,X",   "STA $nn,X",   "STX ($nn),Y", "SMB1 $nn",
   "TYA",       "STA $nnnn,Y", "TXS",       "?",   "STZ $nn",     "STA $nnnn,X", "STZ $nn,X",   "BBS1 $nn",
   "LDY #$nn",  "LDA ($nn,X)", "LDX #$nn",  "?",   "LDY $nn",     "LDA $nnnn",   "LDX $nn",     "SMB2 $nn",
   "TAY",       "LDA #$nn",    "TAX",       "?",   "LDY $nnnn",   "LDA $nnnn",   "LDX $nnnn",   "BBS2 $nn",
-  "BCS rr",    "LDA ($nn),Y", "LDA ($nn)", "?",   "LDY $nn,X",   "LDA $nn,X",   "LDX ($nn),Y", "SMB3 $nn",
+  "BCS rrrr",  "LDA ($nn),Y", "LDA ($nn)", "?",   "LDY $nn,X",   "LDA $nn,X",   "LDX ($nn),Y", "SMB3 $nn",
   "CLV",       "LDA $nnnn,Y", "TSX",       "?",   "LDY $nnnn,X", "LDA $nnnn,X", "LDX $nnnn,Y", "BBS3 $nn",
   "CPY #$nn",  "CMP ($nn,X)", "?",         "?",   "CPY $nnnn",   "CMP $nnnn",   "DEC $nnnn",   "SMB4 $nn",
   "INY",       "CMP #$nn",    "DEX",       "WAI", "CPY $nn",     "CMP $nn",     "DEC $nn",     "BBS4 $nn",
-  "BNE rr",    "CMP ($nn),Y", "CMP ($nn)", "?",   "?",           "CMP $nn,X",   "DEC $nn,X",   "SMB5 $nn",
+  "BNE rrrr",  "CMP ($nn),Y", "CMP ($nn)", "?",   "?",           "CMP $nn,X",   "DEC $nn,X",   "SMB5 $nn",
   "CLD",       "CMP $nnnn,Y", "PHX",       "STP", "?",           "CMP $nnnn,X", "DEC $nnnn,X", "BBS5 $nn",
   "CPX #$nn",  "SBC ($nn,X)", "?",         "?",   "CPX $nn",     "SBC $nn",     "INC $nn",     "SMB6 $nn",
   "INX",       "SBC #$nn",    "NOP",       "?",   "CPX $nnnn",   "SBC $nnnn",   "INC $nnnn",   "BBS6 $nn",
-  "BEQ rr",    "SBC ($nn),Y", "SBC ($nn)", "?",   "?",           "SBC $nn,X",   "INC $nn,X",   "SMB7 $nn",
+  "BEQ rrrr",  "SBC ($nn),Y", "SBC ($nn)", "?",   "?",           "SBC $nn,X",   "INC $nn,X",   "SMB7 $nn",
   "SED",       "SBC $nnnn,Y", "PLX",       "?",   "?",           "SBC $nnnn,X", "INC $nnnn,X", "BBS7 $nnnn"
 };
 
 const char *opcodes_6502[256] = {
   "BRK",       "ORA ($nn,X)", "?",        "?", "?",           "ORA $nn",     "ASL $nn",     "?",
   "PHP",       "ORA #$nn",    "ASLA",     "?", "?",           "ORA $nnnn",   "ASL $nnnn",   "?",
-  "BPL rr",    "ORA ($nn),Y", "?",        "?", "?",           "ORA $nn,X",   "ASL $nn,X",   "?",
+  "BPL rrrr",  "ORA ($nn),Y", "?",        "?", "?",           "ORA $nn,X",   "ASL $nn,X",   "?",
   "CLC",       "ORA $nnnn,Y", "?",        "?", "?",           "ORA $nnnn,X", "ASL $nnnn,X", "?",
   "JSR $nnnn", "AND ($nn,X)", "?",        "?", "BIT $nn",     "AND $nn",     "ROL $nn",     "?",
   "PLP",       "AND #$nn",    "ROLA",     "?", "BIT $nnnn",   "AND $nnnn",   "ROL $nnnn",   "?",
-  "BMI rr",    "AND ($nn),Y", "?",        "?", "?",           "AND $nn,X",   "ROL $nn,X",   "?",
+  "BMI rrrr",  "AND ($nn),Y", "?",        "?", "?",           "AND $nn,X",   "ROL $nn,X",   "?",
   "SEC",       "AND $nnnn,Y", "?",        "?", "?",           "AND $nnnn,X", "ROL $nnnn,X", "?",
   "RTI",       "EOR ($nn,X)", "?",        "?", "?",           "EOR nn",      "LSR $nn",     "?",
   "PHA",       "EOR #$nn",    "LSRA",     "?", "JMP $nnnn",   "EOR $nnnn",   "LSR $nnnn",   "?",
-  "BVC rr",    "EOR ($nn),Y", "?",        "?", "?",           "EOR $nn,X",   "LSR $nn,X",   "?",
+  "BVC rrrr",  "EOR ($nn),Y", "?",        "?", "?",           "EOR $nn,X",   "LSR $nn,X",   "?",
   "CLI",       "EOR $nnnn,Y", "?",        "?", "?",           "EOR $nnnn,X", "LSR $nnnn,X", "?",
   "RTS",       "ADC ($nn,X)", "?",        "?", "?",           "ADC $nn",     "ROR $nn",     "?",
   "PLA",       "ADC #$nn",    "RORA",     "?", "JMP ($nnnn)", "ADC $nnnn",   "ROR $nnnn",   "?",
-  "BVS rr",    "ADC ($nn),Y", "?",        "?", "?",           "ADC $nn,X",   "ROR $nn,X",   "?",
+  "BVS rrrr",  "ADC ($nn),Y", "?",        "?", "?",           "ADC $nn,X",   "ROR $nn,X",   "?",
   "SEI",       "ADC $nnnn,Y", "?",        "?", "?",           "ADC $nnnn,X", "ROR $nnnn,X", "?",
   "?",         "STA ($nn,X)", "?",        "?", "STY $nn",     "STA $nn",     "STX $nn",     "?",
   "DEY",       "?",           "TXA",      "?", "STY $nnnn",   "STA $nnnn",   "STX $nnnn",   "?",
-  "BCC rr",    "STA ($nn),Y", "?",        "?", "STY $nn,X",   "STA $nn,X",   "STX $nn,Y",   "?",
+  "BCC rrrr",  "STA ($nn),Y", "?",        "?", "STY $nn,X",   "STA $nn,X",   "STX $nn,Y",   "?",
   "TYA",       "STA $nnnn,Y", "TXS",      "?", "?",           "STA $nnnn,X", "?",           "?",
   "LDY #$nn",  "LDA ($nn,X)", "LDX #$nn", "?", "LDY $nn",     "LDA $nn",     "LDX $nn",     "?",
   "TAY",       "LDA #$nn",    "TAX",      "?", "LDY $nnnn",   "LDA $nnnn",   "LDX $nnnn",   "?",
-  "BCS rr",    "LDA ($nn),Y", "?",        "?", "LDY $nn,X",   "LDA $nn,X",   "LDX $nn,Y",   "?",
+  "BCS rrrr",  "LDA ($nn),Y", "?",        "?", "LDY $nn,X",   "LDA $nn,X",   "LDX $nn,Y",   "?",
   "CLV",       "LDA $nnnn,Y", "TSX",      "?", "LDY $nnnn,X", "LDA $nnnn,X", "LDX $nnnn,Y", "?",
   "CPY #$nn",  "CMP ($nn,X)", "?",        "?", "CPY $nn",     "CMP $nn",     "DEC $nn",     "?",
   "INY",       "CMP #$nn",    "DEX",      "?", "CPY $nnnn",   "CMP $nnnn",   "DEC $nnnn",   "?",
-  "BNE rr",    "CMP ($nn),Y", "?",        "?", "?",           "CMP $nn,X",   "DEC $nn,X",   "?",
+  "BNE rrrr",  "CMP ($nn),Y", "?",        "?", "?",           "CMP $nn,X",   "DEC $nn,X",   "?",
   "CLD",       "CMP $nnnn,Y", "?",        "?", "?",           "CMP $nnnn,X", "DEC $nnnn,X", "?",
   "CPX #$nn",  "SBC ($nn,X)", "?",        "?", "CPX $nn",     "SBC $nn",     "INC $nn",     "?",
   "INX",       "SBC #$nn",    "NOP",      "?", "CPX $nnnn",   "SBC $nnnn",   "INC $nnnn",   "?",
-  "BEQ rr",    "SBC ($nn),Y", "?",        "?", "?",           "SBC $nn,X",   "INC $nn,X",   "?",
+  "BEQ rrrr",  "SBC ($nn),Y", "?",        "?", "?",           "SBC $nn,X",   "INC $nn,X",   "?",
   "SED",       "SBC $nnnn,Y", "?",        "?", "?",           "SBC $nnnn,X", "INC $nnnn,X", "?"
 };
 
@@ -303,7 +303,7 @@ insn_decode_format_6502(struct insn_decode *id)
     case am6502_rel8:
       val = (int8_t)id->bytes[1];   // sign-extend
       if ((cp = strstr(id->insn_string, "rrrr")) != NULL) {
-        sprintf(op, "%4d", val);
+        sprintf(op, "%-4d", val);
         memcpy(cp, op, 4);
         id->resolved_address = id->insn_address + id->bytes_required + val;
         id->resolved_address_valid = true;
@@ -808,7 +808,7 @@ insn_decode_format_6809(struct insn_decode *id)
       break;
 
     case am6809_direct:
-      sprintf(id->insn_string, "%s < $%02x", opc, id->bytes[i]);
+      sprintf(id->insn_string, "%s < $%02X", opc, id->bytes[i]);
       break;
 
     case am6809_extended_ind:
@@ -817,7 +817,7 @@ insn_decode_format_6809(struct insn_decode *id)
       // FALLTHROUGH
     case am6809_extended:
       u16 = read_u16be(id->bytes, i);
-      sprintf(id->insn_string, "%s %s$%04x%s", opc, ind_open, u16, ind_close);
+      sprintf(id->insn_string, "%s %s$%04X%s", opc, ind_open, u16, ind_close);
       break;
 
     case am6809_rel8:
@@ -832,12 +832,12 @@ insn_decode_format_6809(struct insn_decode *id)
       break;
 
     case am6809_imm8:
-      sprintf(id->insn_string, "%s #$%02x", opc, id->bytes[i]);
+      sprintf(id->insn_string, "%s #$%02X", opc, id->bytes[i]);
       break;
 
     case am6809_imm16:
       u16 = read_u16be(id->bytes, i);
-      sprintf(id->insn_string, "%s #$%04x", opc, u16);
+      sprintf(id->insn_string, "%s #$%04X", opc, u16);
       break;
 
     case am6809_zero_off:
@@ -1206,7 +1206,7 @@ insn_decode_next_state_6809(struct insn_decode *id)
 // one of these at a time.
 //
 
-// #define DEBUG_6502
+//#define DEBUG_6502
 #ifdef DEBUG_6502
 #define DEBUG_CPU   cpu_6502
 // Main goal of the 6502 debug data is to exercise the instruction decoder.
@@ -1240,25 +1240,29 @@ const uint32_t debug_address[] = {
   0x1006, 0x1007,
 };
 
+#define N (CC_6502_RW | CC_6502_RESET | CC_6502_NMI | CC_6502_IRQ)
+
 const uint32_t debug_control[] = {
   // BRK
-  CC_6502_SYNC,
+  CC_6502_SYNC | N,
 
   // ORA $20
-  CC_6502_SYNC, 0,
+  CC_6502_SYNC | N, N,
 
   // LDY $3000
-  CC_6502_SYNC, 0, 0,
+  CC_6502_SYNC | N, N, N,
 
   // BPL 16
-  CC_6502_SYNC, 0,
+  CC_6502_SYNC | N, N,
 };
+
+#undef N
 #endif // DEBUG_6502
 
 #ifdef DEBUG_6809
 #endif // DEBUG_6809
 
-// #define DEBUG_6809E
+#define DEBUG_6809E
 #ifdef DEBUG_6809E
 #define DEBUG_CPU   cpu_6809e
 
@@ -1436,91 +1440,95 @@ const uint32_t debug_address[] = {
   0x1044, 0x1045, 0x1047, 0x1048,
 };
 
+#define N   (CC_6809_RW | CC_6809_IRQ | CC_6809_FIRQ | CC_6809_NMI | CC_6809_RESET)
+
 const uint32_t debug_control[] = {
   // Dummy sample, just to set LIC
-  CC_6809E_LIC,
+  CC_6809E_LIC | N,
 
   // Inherent addressing mode: NEGA
-  CC_6809E_LIC,
+  CC_6809E_LIC | N,
 
   // Direct addressing mode: INC < $10
-  0, CC_6809E_LIC,
+  N, CC_6809E_LIC | N,
 
   // Relative addressing mode: BRA -3
-  0, CC_6809E_LIC,
+  N, CC_6809E_LIC | N,
 
   // Extended addressing mode: ASR $CAFE
-  0, 0, CC_6809E_LIC,
+  N, N, CC_6809E_LIC | N,
 
   // Immediate addressing mode: ORA #$5A
-  0, CC_6809E_LIC,
+  N, CC_6809E_LIC | N,
 
   // Indexed zero-offset: LEAX ,X
-  0, CC_6809E_LIC,
+  N, CC_6809E_LIC | N,
 
   // Indexed zero-offset indirect: LEAX [,X]
-  0, CC_6809E_LIC,
+  N, CC_6809E_LIC | N,
 
   // Indexed 5-bit constant offset: LEAY 1,Y
-  0, CC_6809E_LIC,
+  N, CC_6809E_LIC | N,
 
   // Indexed 8-bit constant offset: LEAS -64,S
-  0, 0, CC_6809E_LIC,
+  N, N, CC_6809E_LIC | N,
 
   // Indexed 8-bit constant offset indirect: LEAU [-64,U]
-  0, 0, CC_6809E_LIC,
+  N, N, CC_6809E_LIC | N,
 
   // Indexed 16-bit constant offset: SUBA 384,Y
-  0, 0, 0, CC_6809E_LIC,
+  N, N, N, CC_6809E_LIC | N,
 
   // Indexed 16-bit constant offset indirect: LDA [1024,X]
-  0, 0, 0, CC_6809E_LIC,
+  N, N, N, CC_6809E_LIC | N,
 
   // Indexed accumulator offset: STA A,U
-  0, CC_6809E_LIC,
+  N, CC_6809E_LIC | N,
 
   // Indexed accumulator offset indirect: STA [A,U]
-  0, CC_6809E_LIC,
+  N, CC_6809E_LIC | N,
 
   // Indexed accumulator offset: ORA B,Y
-  0, CC_6809E_LIC,
+  N, CC_6809E_LIC | N,
 
   // Indexed accumulator offset: CMPX D,S
-  0, CC_6809E_LIC,
+  N, CC_6809E_LIC | N,
 
   // Indexed Auto Increment by 1: LDA ,X+
-  0, CC_6809E_LIC,
+  N, CC_6809E_LIC | N,
 
   // Indexed Auto Increment by 2: LDY ,X++
-  0, 0, CC_6809E_LIC,
+  N, N, CC_6809E_LIC | N,
 
   // Indexed Auto Increment by 2 indirect: LDY [,X++]
-  0, 0, CC_6809E_LIC,
+  N, N, CC_6809E_LIC | N,
 
   // Indexed Auto Decrement by 1: LDA ,-X
-  0, CC_6809E_LIC,
+  N, CC_6809E_LIC | N,
 
   // Indexed Auto Decrement by 2: LDY ,--X
-  0, 0, CC_6809E_LIC,
+  N, N, CC_6809E_LIC | N,
 
   // Indexed Auto Decrement by 2 indirect: LDY [,--X]
-  0, 0, CC_6809E_LIC,
+  N, N, CC_6809E_LIC | N,
 
   // Indexed constant 8-bit offset from PC: LDB 10,PCR
-  0, 0, CC_6809E_LIC,
+  N, N, CC_6809E_LIC | N,
 
   // Indexed constant 8-bit offset from PC indirect: LDB [10,PCR]
-  0, 0, CC_6809E_LIC,
+  N, N, CC_6809E_LIC | N,
 
   // Indexed constant 16-bit offset from PC: LDB 32767,PCR
-  0, 0, 0, CC_6809E_LIC,
+  N, N, N, CC_6809E_LIC | N,
 
   // Indexed constant 16-bit offset from PC indirect: LDB 32767,PCR
-  0, 0, 0, CC_6809E_LIC,
+  N, N, N, CC_6809E_LIC | N,
 
   // Extended indirect addressing mode: BITA [$CAFE]
-  0, 0, 0, CC_6809E_LIC,
+  N, N, N, CC_6809E_LIC | N,
 };
+
+#undef N
 #endif // DEBUG_6809E
 
 #ifdef DEBUG_6800
