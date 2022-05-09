@@ -1206,7 +1206,7 @@ insn_decode_next_state_6809(struct insn_decode *id)
 // one of these at a time.
 //
 
-//#define DEBUG_6502
+// #define DEBUG_6502
 #ifdef DEBUG_6502
 #define DEBUG_CPU   cpu_6502
 // Main goal of the 6502 debug data is to exercise the instruction decoder.
@@ -1262,7 +1262,7 @@ const uint32_t debug_control[] = {
 #ifdef DEBUG_6809
 #endif // DEBUG_6809
 
-#define DEBUG_6809E
+// #define DEBUG_6809E
 #ifdef DEBUG_6809E
 #define DEBUG_CPU   cpu_6809e
 
