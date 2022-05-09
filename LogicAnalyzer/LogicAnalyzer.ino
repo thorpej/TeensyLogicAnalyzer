@@ -1996,9 +1996,7 @@ insn_decode_continue(struct insn_decode *id, uint8_t b)
       id->state = ds_complete;
     } else {
       id->bytes[id->bytes_fetched++] = b;
-      if (id->bytes_required == 0 || id->bytes_fetched == id->bytes_required) {
-        was_fetching = insn_decode_next_state(id);
-      }
+      was_fetching = insn_decode_next_state(id);
     }
   }
   return was_fetching;
