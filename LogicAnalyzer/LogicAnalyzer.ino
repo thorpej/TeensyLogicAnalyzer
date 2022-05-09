@@ -172,7 +172,7 @@ read_s16be(const uint8_t *buf, int i)
 //
 typedef enum { ds_idle, ds_fetching, ds_complete } decode_state_t;
 #define INSN_DECODE_MAXBYTES    8
-#define INSN_DECODE_MAXSTRING   20
+#define INSN_DECODE_MAXSTRING   28  // See also printf format in list().
 struct insn_decode {
   decode_state_t      state;
   uint32_t            insn_address;
@@ -1951,6 +1951,24 @@ insn_decode_init(struct insn_decode *id)
   }
 }
 
+bool
+insn_decode_next_state(struct insn_decode *id)
+{
+  decode_state_t ostate = id->state;
+
+  if (id->next_state != NULL) {
+    (*id->next_state)(id);
+    if (ostate == ds_fetching) {
+      if (id->state == ds_complete && id->resolved_address_valid) {
+        char *cp = &id->insn_string[strlen(id->insn_string)];
+        sprintf(cp, " <%04lX>", id->resolved_address);
+      }
+      return true;
+    }
+  }
+  return false;
+}
+
 void
 insn_decode_begin(struct insn_decode *id, uint32_t addr, uint8_t b)
 {
@@ -1963,27 +1981,27 @@ insn_decode_begin(struct insn_decode *id, uint32_t addr, uint8_t b)
     id->bytes_required = 0;
     id->bytes_fetched = 0;
     id->bytes[id->bytes_fetched++] = b;
-    (*id->next_state)(id);
+    insn_decode_next_state(id);
   }
 }
 
 bool
 insn_decode_continue(struct insn_decode *id, uint8_t b)
 {
-  decode_state_t ostate;
+  bool was_fetching = false;
 
-  if ((ostate = id->state) == ds_fetching) {
+  if (id->state == ds_fetching) {
     if (id->bytes_fetched == INSN_DECODE_MAXBYTES) {
       strcpy(id->insn_string, "<decode overflow>");
       id->state = ds_complete;
     } else {
       id->bytes[id->bytes_fetched++] = b;
       if (id->bytes_required == 0 || id->bytes_fetched == id->bytes_required) {
-        (*id->next_state)(id);
+        was_fetching = insn_decode_next_state(id);
       }
     }
   }
-  return ostate == ds_fetching;
+  return was_fetching;
 }
 
 const char *
@@ -2186,8 +2204,9 @@ list(Stream &stream, int start, int end, int validSamples)
         comment = "<--- TRIGGER ----";
       }
 
+      // This printf format needs to be kept in sync with INSN_DECODE_MAXSTRING.
       sprintf(output,
-          "%04lX  %-2s  %02lX  %-20s  %s",
+          "%04lX  %-2s  %02lX  %-28s  %s",
           address[i], cycle, data[i], insn_decode_complete(&id),
           comment);
 
