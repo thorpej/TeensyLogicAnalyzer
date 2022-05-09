@@ -206,9 +206,9 @@ struct insn_decode {
 //
 const char *opcodes_65c02[256] = {
   "BRK",       "ORA ($nn,X)", "?",         "?",   "TSB $nn",     "ORA $nn",     "ASL $nn",     "RMB0 $nn",
-  "PHP",       "ORA #$nn",    "ASLA",      "?",   "TSB XXXX",    "ORA $nnnn",   "ASL $nnnn",   "BBR0 $nn",
+  "PHP",       "ORA #$nn",    "ASLA",      "?",   "TSB $nnnn",   "ORA $nnnn",   "ASL $nnnn",   "BBR0 $nn",
   "BPL rrrr",  "ORA ($nn),Y", "ORA ($nn)", "?",   "TRB $nn",     "ORA $nn,X",   "ASL $nn,X",   "RMB1 $nn",
-  "CLC",       "ORA $nnnn,Y", "INCA",      "?",   "TRB $nn",     "ORA $nnnn,X", "ASL $nnnn,X", "BBR1 $nn",
+  "CLC",       "ORA $nnnn,Y", "INCA",      "?",   "TRB $nnnn",   "ORA $nnnn,X", "ASL $nnnn,X", "BBR1 $nn",
   "JSR $nnnn", "AND ($nn,X)", "?",         "?",   "BIT $nn",     "AND $nn",     "ROL $nn",     "RMB2 $nn",
   "PLP",       "AND #$nn",    "ROLA",      "?",   "BIT $nnnn",   "AND $nnnn",   "ROL $nnnn",   "BBR2 $nn",
   "BMI rrrr",  "AND ($nn),Y", "AND ($nn)", "?",   "BIT $nn,X",   "AND $nn,X",   "ROL $nn,X",   "RMB3 $nn",
@@ -236,7 +236,7 @@ const char *opcodes_65c02[256] = {
   "CPX #$nn",  "SBC ($nn,X)", "?",         "?",   "CPX $nn",     "SBC $nn",     "INC $nn",     "SMB6 $nn",
   "INX",       "SBC #$nn",    "NOP",       "?",   "CPX $nnnn",   "SBC $nnnn",   "INC $nnnn",   "BBS6 $nn",
   "BEQ rrrr",  "SBC ($nn),Y", "SBC ($nn)", "?",   "?",           "SBC $nn,X",   "INC $nn,X",   "SMB7 $nn",
-  "SED",       "SBC $nnnn,Y", "PLX",       "?",   "?",           "SBC $nnnn,X", "INC $nnnn,X", "BBS7 $nnnn"
+  "SED",       "SBC $nnnn,Y", "PLX",       "?",   "?",           "SBC $nnnn,X", "INC $nnnn,X", "BBS7 $nn"
 };
 
 const char *opcodes_6502[256] = {
@@ -2393,11 +2393,7 @@ writeSD(void)
   const char *CSV_FILE = "analyzer.csv";
   const char *TXT_FILE = "analyzer.txt";
 
-  if (cpu == cpu_none) {
-    return;
-  }
-
-  if (samplesTaken == 0) {
+  if (cpu == cpu_none || samplesTaken == 0) {
     Serial.println("No samples to save.");
     return;
   }
