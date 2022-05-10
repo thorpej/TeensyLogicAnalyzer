@@ -1370,6 +1370,20 @@ const uint32_t debug_data[] = {
 
   // Dummy IRQ handler (NOP)
   0x12,
+
+  // LBSR example cycle-by-cycle flow from 6809E data sheet
+  0x17, 0x20, 0x00,
+  0xff, 0xff,     // VMA, VMA
+  0x12,           // NOP
+  0xff,           // VMA
+  0x88, 0x03,
+
+  // DEC example cycle-by-cycle flow from 6809E data sheet
+  0x7a, 0xa0, 0x00,
+  0xff,
+  0x80,
+  0xff,
+  0x7f,
 };
 
 const uint32_t debug_address[] = {
@@ -1474,9 +1488,25 @@ const uint32_t debug_address[] = {
 
   // Dummy IRQ handler (NOP)
   0xc000,
+
+  // LBSR example cycle-by-cycle flow from 6809E data sheet
+  0x8000, 0x8001, 0x8002,
+  0xffff, 0xffff,   // VMA, VMA
+  0xa000,
+  0xffff,           // VMA
+  0xefff,
+  0xeffe,
+
+  // DEC example cycle-by-cycle flow from 6809E data sheet
+  0x8000, 0x8001, 0x8002,
+  0xffff,
+  0xa000,
+  0xffff,
+  0xa000,   // data sheet contains a paste-o (FFFF) here
 };
 
 #define N   (CC_6809_RW | CC_6809_IRQ | CC_6809_FIRQ | CC_6809_NMI | CC_6809_RESET)
+#define VMA (CC_6809_RW | CC_6809_IRQ | CC_6809_FIRQ | CC_6809_NMI | CC_6809_RESET)
 
 const uint32_t debug_control[] = {
   // Dummy sample, just to set LIC
@@ -1580,9 +1610,24 @@ const uint32_t debug_control[] = {
 
   // Dummy IRQ handler (NOP)
   (N & ~CC_6809_IRQ) | CC_6809E_LIC,
+
+  // LBSR example cycle-by-cycle flow from 6809E data sheet
+  N, N, N,
+  VMA, VMA,
+  N,
+  VMA,
+  N  & ~CC_6809_RW, (N & ~CC_6809_RW) | CC_6809E_LIC,
+
+  // DEC example cycle-by-cycle flow from 6809E data sheet
+  N, N, N,
+  VMA,
+  N,
+  VMA,
+  (N & ~CC_6809_RW) | CC_6809E_LIC,
 };
 
 #undef N
+#undef VMA
 #endif // DEBUG_6809E
 
 #ifdef DEBUG_6800
