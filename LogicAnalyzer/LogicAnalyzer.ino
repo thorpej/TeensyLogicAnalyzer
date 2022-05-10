@@ -2125,7 +2125,7 @@ list(Stream &stream, int start, int end, int validSamples)
           // this is an insn fetch.  Don't try to decode an instruction
           // if it looks like we're doing a vector fetch, though.
           cycle = "R";
-          if (cpu == cpu_6809e && address[i] < 0xfff2) {
+          if (cpu == cpu_6809e && address[i] < 0xfff0) {
             if (seen_lic) {
               cycle = "F";
               insn_decode_begin(&id, address[i], data[i]);
