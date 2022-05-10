@@ -1264,7 +1264,8 @@ const uint32_t debug_control[] = {
 
 // #define DEBUG_6809E
 #ifdef DEBUG_6809E
-#define DEBUG_CPU   cpu_6809e
+#define DEBUG_CPU             cpu_6809e
+#define DEBUG_TRIGGER_POINT   84
 
 // Main goal of the 6809E debug data is to exercise the instruction decoder.
 // Most of these samples are not cycle-accurate in any way, shape, or form.
@@ -2952,7 +2953,11 @@ loop(void) {
       memcpy(data, debug_data, sizeof(debug_data));
       memcpy(address, debug_address, sizeof(debug_address));
       memcpy(control, debug_control, sizeof(debug_control));
-#endif
+#ifdef DEBUG_TRIGGER_POINT
+      triggerPoint = DEBUG_TRIGGER_POINT;
+      pretrigger = DEBUG_TRIGGER_POINT;
+#endif  // DEBUG_TRIGGER_POINT
+#endif  // DEBUG_SAMPLES
     } else {
       // Invalid command
       if (cmd != "") {
