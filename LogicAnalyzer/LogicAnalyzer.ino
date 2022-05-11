@@ -2025,6 +2025,7 @@ help(void)
   Serial.println("l [start] [end]      - List samples");
   Serial.println("e                    - Export samples as CSV");
   Serial.println("w                    - Write data to SD card");
+  Serial.println("d <address>          - Decode instruction at address");
 #ifdef DEBUG_SAMPLES
   Serial.println("D                    - Load debug sample data");
 #endif
@@ -2110,6 +2111,58 @@ insn_decode_complete(struct insn_decode *id)
      return id->insn_string;
   }
   return "";
+}
+
+// Disassemble a single instrution at the specified address.
+void
+disassemble_one(uint32_t where)
+{
+  struct insn_decode id;
+  insn_decode_init(&id);
+
+  int first = (triggerPoint - pretrigger + samples) % samples;
+  int last = (triggerPoint - pretrigger + samples - 1) % samples;
+  int i;
+
+  // First, search through the sample data looking for the address.
+  for (i = first; i != last; i = (i + 1) % samples) {
+    if (address[i] == where) {
+      break;
+    }
+  }
+  if (address[i] != where) {
+    Serial.println("Address not found in sample data.");
+    return;
+  }
+
+  char output[50];
+  bool complete;
+
+  for (;; i = (i + 1) % samples) {
+    switch (id.state) {
+      case ds_idle:
+        insn_decode_begin(&id, address[i], data[i]);
+        goto printit;
+
+      case ds_fetching:
+        if (address[i] != where + id.bytes_fetched) {
+          Serial.println("!!!! Non-contiguous instruction fetch?");
+        }
+        // FALLTHROUGH
+
+      default:
+        insn_decode_continue(&id, data[i]);
+      printit:
+        complete = id.state == ds_complete;
+        sprintf(output, "%04lX  %02lX  %s",
+            address[i], data[i], insn_decode_complete(&id));
+        Serial.println(output);
+        break;
+    }
+    if (complete || i == last) {
+      return;
+    }
+  }
 }
 
 // List recorded data from start to end.
@@ -2897,6 +2950,15 @@ loop(void) {
         }
       } else {
         Serial.println("Invalid address, must be between 0 and FF.");
+      }
+
+      // Decode instruction
+    } else if (cmd.startsWith("d ")) {
+      int n = strtol(cmd.substring(2, 6).c_str(), NULL, 16);
+      if (n >= 0 && n <= 0xffff) {
+        disassemble_one(n);
+      } else {
+        Serial.println("Invalid address, must be between 0 and FFFF.");
       }
 
       // Go
