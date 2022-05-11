@@ -2119,6 +2119,10 @@ list(Stream &stream, int start, int end, int validSamples)
   char output[80];
   char comment[30], *cp;
 
+  if (cpu == cpu_none || validSamples == 0) {
+    return;
+  }
+
   int first = (triggerPoint - pretrigger + samples) % samples;
   int last = (triggerPoint - pretrigger + samples - 1) % samples;
 
@@ -2129,10 +2133,6 @@ list(Stream &stream, int start, int end, int validSamples)
 
   struct insn_decode id;
   insn_decode_init(&id);
-
-  if (cpu == cpu_none || validSamples == 0) {
-    return;
-  }
 
   // Display data
   int i = first;
@@ -2346,13 +2346,13 @@ list(Stream &stream, int start, int end, int validSamples)
 const char *
 exportCSV_header_6502(void)
 {
-  return "Index,SYNC,R/W,/RESET,/IRQ,/NMI,Address,Data";
+  return "Index,Trigger,SYNC,R/W,/RESET,/IRQ,/NMI,Address,Data";
 }
 
 void
 exportCSV_entry_6502(int i, int j, char *output)
 {
-  sprintf(output, "%d,%c,%c,%c,%c,%c,%04lX,%02lX", j,
+  sprintf(output, "%d,%d,%c,%c,%c,%c,%c,%04lX,%02lX", j, i == triggerPoint,
       EXPORT_CC(CC_6502_SYNC),
       EXPORT_CC(CC_6502_RW),
       EXPORT_CC(CC_6502_RESET),
@@ -2364,13 +2364,13 @@ exportCSV_entry_6502(int i, int j, char *output)
 const char *
 exportCSV_header_6800(void)
 {
-  return "Index,VMA,R/W,/RESET,/IRQ,/NMI,Address,Data";
+  return "Index,Trigger,VMA,R/W,/RESET,/IRQ,/NMI,Address,Data";
 }
 
 void
 exportCSV_entry_6800(int i, int j, char *output)
 {
-  sprintf(output, "%d,%c,%c,%c,%c,%c,%04lX,%02lX", j,
+  sprintf(output, "%d,%d,%c,%c,%c,%c,%c,%04lX,%02lX", j, i == triggerPoint,
       EXPORT_CC(CC_6800_VMA),
       EXPORT_CC(CC_6800_RW),
       EXPORT_CC(CC_6800_RESET),
@@ -2382,13 +2382,13 @@ exportCSV_entry_6800(int i, int j, char *output)
 const char *
 exportCSV_header_6809(void)
 {
-  return "Index,BA,BS,R/W,/RESET,/IRQ,/FIRQ,/NMI,Address,Data";
+  return "Index,Trigger,BA,BS,R/W,/RESET,/IRQ,/FIRQ,/NMI,Address,Data";
 }
 
 void
 exportCSV_entry_6809(int i, int j, char *output)
 {
-  sprintf(output, "%d,%c,%c,%c,%c,%c,%c,%c,%04lX,%02lX",j,
+  sprintf(output, "%d,%d,%c,%c,%c,%c,%c,%c,%c,%04lX,%02lX",j, i == triggerPoint,
       EXPORT_CC(CC_6809_BA),
       EXPORT_CC(CC_6809_BS),
       EXPORT_CC(CC_6809_RW),
@@ -2402,13 +2402,13 @@ exportCSV_entry_6809(int i, int j, char *output)
 const char *
 exportCSV_header_6809e(void)
 {
-  return "Index,BA,BS,LIC,R/W,/RESET,/IRQ,/FIRQ,/NMI,Address,Data";
+  return "Index,Trigger,BA,BS,LIC,R/W,/RESET,/IRQ,/FIRQ,/NMI,Address,Data";
 }
 
 void
 exportCSV_entry_6809e(int i, int j, char *output)
 {
-  sprintf(output, "%d,%c,%c,%c,%c,%c,%c,%c,%c,%04lX,%02lX", j,
+  sprintf(output, "%d,%d,%c,%c,%c,%c,%c,%c,%c,%c,%04lX,%02lX", j, i == triggerPoint,
       EXPORT_CC(CC_6809_BA),
       EXPORT_CC(CC_6809_BS),
       EXPORT_CC(CC_6809E_LIC),
@@ -2423,13 +2423,13 @@ exportCSV_entry_6809e(int i, int j, char *output)
 const char *
 exportCSV_header_z80(void)
 {
-  return "Index,/M1,/RD,/WR,/MREQ,/IORQ,/RESET,/INT,Address,Data";
+  return "Index,Trigger,/M1,/RD,/WR,/MREQ,/IORQ,/RESET,/INT,Address,Data";
 }
 
 void
 exportCSV_entry_z80(int i, int j, char *output)
 {
-  sprintf(output, "%d,%c,%c,%c,%c,%c,%c,%c,%04lX,%02lX", j,
+  sprintf(output, "%d,%d,%c,%c,%c,%c,%c,%c,%c,%04lX,%02lX", j, i == triggerPoint,
       EXPORT_CC(CC_Z80_M1),
       EXPORT_CC(CC_Z80_RD),
       EXPORT_CC(CC_Z80_WR),
