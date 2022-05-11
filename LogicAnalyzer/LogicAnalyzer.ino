@@ -2073,7 +2073,8 @@ insn_decode_next_state(struct insn_decode *id)
 void
 insn_decode_begin(struct insn_decode *id, uint32_t addr, uint8_t b)
 {
-  if (id->next_state != NULL && id->state == ds_idle) {
+  if (id->next_state != NULL &&
+      (id->state == ds_idle || id->state == ds_complete)) {
     id->state = ds_fetching;
     id->insn_address = addr;
     id->resolved_address = 0;
@@ -2107,7 +2108,6 @@ const char *
 insn_decode_complete(struct insn_decode *id)
 {
   if (id->state == ds_complete) {
-     id->state = ds_idle;
      return id->insn_string;
   }
   return "";
@@ -2136,7 +2136,6 @@ disassemble_one(uint32_t where)
   }
 
   char output[50];
-  bool complete;
 
   for (;; i = (i + 1) % samples) {
     switch (id.state) {
@@ -2153,13 +2152,12 @@ disassemble_one(uint32_t where)
       default:
         insn_decode_continue(&id, data[i]);
       printit:
-        complete = id.state == ds_complete;
         sprintf(output, "%04lX  %02lX  %s",
             address[i], data[i], insn_decode_complete(&id));
         Serial.println(output);
         break;
     }
-    if (complete || i == last) {
+    if (id.state == ds_complete || i == last) {
       return;
     }
   }
