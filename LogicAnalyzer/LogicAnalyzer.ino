@@ -707,7 +707,7 @@ z80_insn_template(struct insn_decode *id)
   static const char *ld_regs[8] = { "B", "C", "D", "E", "H", "L", "(HL)", "A" };
   static const char *io_regs[8] = { "B", "C", "D", "E", "H", "L", "?", "A" };
   static const char *ld_regs16[4] = { "BC", "DE", "HL", "SP" };
-  char tbuf[16];
+  char tbuf[INSN_DECODE_MAXSTRING];
   uint8_t opc = id->bytes[0];
   uint8_t reg16, ioreg;
 
