@@ -2400,7 +2400,7 @@ const uint32_t debug_address[] = {
   // LD (DE),A
   0x101d,
 
-  // LD (0x4567),A
+  // LD (4567h),A
   0x101e,
   0x101f,
   0x1020,
@@ -2472,7 +2472,7 @@ const uint32_t debug_control[] = {
   // LD (DE),A
   FN,
 
-  // LD (0x4567),A
+  // LD (4567h),A
   FN, N, N,
 
   // LD A,I
