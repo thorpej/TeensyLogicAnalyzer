@@ -603,7 +603,7 @@ const struct {
     { "XXXXh",    amz80_u16,     }
     { "XXh",      amz80_u8,      }
     { "+ddd",     amz80_disp8,   }
-    { "rrr",      amz80_pcrel8,  }
+    { "rrrr",     amz80_pcrel8,  }
     { NULL,       am_invalid,    }  // not really invalid, just "none" or "no more"
 };
 
