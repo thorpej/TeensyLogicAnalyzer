@@ -626,23 +626,23 @@ z80_operand_size(addrmode_t mode)
 char *
 z80_next_operand(addrmode_t *modep, char **cursor)
 {
-  char *cur = *cursor;
   char *cp;
+  size_t oplen;
   int i;
 
-  for (i = 0; z80_operand_types[i].opr_string != NULL; i++) {
-    cp = strstr(cur, z80_operand_types[i].opr_string);
-    if (cp != NULL) {
-      // Found one!  Advance the cursor beyond it.
-      cur = cp + strlen(z80_operand_types[i].opr_string);
-      *cursor = cur;
-      if (modep != NULL) {
-        *modep = z80_operand_types[i].opr_mode;
+  for (cp = *cursor; *cp != '\0'; cp++) {
+    for (i = 0; z80_operand_types[i].opr_string != NULL; i++) {
+      oplen = strlen(z80_operand_types[i].opr_string);
+      if (memcmp(cp, z80_operand_types[i].opr_string, oplen) == 0) {
+        // Found one!  Advance the cursor beyond it.
+        *cursor = cp + oplen;
+        if (modep != NULL) {
+          *modep = z80_operand_types[i].opr_mode;
+        }
+        return cp;
       }
-      return cp;
     }
   }
-
   // No more operand substitutions found.
   return NULL;
 }
@@ -947,8 +947,10 @@ insn_decode_next_state_z80(struct insn_decode *id)
     if (! z80_insn_template(id)) {
       return;
     }
-    // Serial.print("Got template: ");
-    // Serial.println(id->insn_string);
+#if 0
+    Serial.print("Got template: ");
+    Serial.println(id->insn_string);
+#endif
 
     //
     // OK, we have the insn template, and therefore know all of the
@@ -971,14 +973,18 @@ insn_decode_next_state_z80(struct insn_decode *id)
     char *curs, *cp;
     addrmode_t mode;
     for (curs = id->insn_string; (cp = z80_next_operand(&mode, &curs)) != NULL;) {
-      // Serial.print("  Cursor: ");
-      // Serial.println(curs);
-      // Serial.print("  Operand: ");
-      // Serial.println(cp);
+#if 0
+      Serial.print("  Cursor: ");
+      Serial.println(curs);
+      Serial.print("  Operand: ");
+      Serial.println(cp);
+#endif
       id->bytes_required += z80_operand_size(mode);
     }
-    // Serial.print("  Bytes required: ");
-    // Serial.println(id->bytes_required, DEC);
+#if 0
+    Serial.print("  Bytes required: ");
+    Serial.println(id->bytes_required, DEC);
+#endif
   }
 
   // If we've now fetched the number of required bytes, we can
@@ -2311,7 +2317,7 @@ const uint32_t debug_data[] = {
   // LD (DE),A
   0x12,
 
-  // LD (0x4567),A
+  // LD (4567h),A
   0x32,
   0x67,
   0x45,
