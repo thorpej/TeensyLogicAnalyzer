@@ -558,7 +558,6 @@ insn_decode_next_state_6800(struct insn_decode *id)
   }
 }
 
-#if 0
 // Instructions for Z80 disassembler.
 // Two-byte extended instructions are not yet supported.
 const char *opcodes_z80[256] = {
@@ -600,11 +599,11 @@ const struct {
   const char *opr_string;
   addrmode_t opr_mode;
 } z80_operand_types[] = {
-    { "XXXXh",    amz80_u16,     }
-    { "XXh",      amz80_u8,      }
-    { "+ddd",     amz80_disp8,   }
-    { "rrrr",     amz80_pcrel8,  }
-    { NULL,       am_invalid,    }  // not really invalid, just "none" or "no more"
+    { "XXXXh",    amz80_u16,     },
+    { "XXh",      amz80_u8,      },
+    { "+ddd",     amz80_disp8,   },
+    { "rrrr",     amz80_pcrel8,  },
+    { NULL,       am_invalid,    }, // not really invalid, just "none" or "no more"
 };
 
 int
@@ -665,7 +664,7 @@ z80_hl_to_index(struct insn_decode *id, const char *tmpl, uint8_t opc, uint8_t w
       break;
     }
     c = (*cp++ = *t1++);
-    if (c == '\0') {"
+    if (c == '\0') {
       // No HL to substitute.
       return false;
     }
@@ -836,6 +835,106 @@ z80_insn_template(struct insn_decode *id)
 }
 
 void
+insn_decode_format_z80(struct insn_decode *id)
+{
+  //
+  // All of the heavy lifting has been done for us already, in building
+  // up the insn template that's stashed away in id->insn_string.  All
+  // we need to do now is enumerate the operands and substitute the
+  // values into the template with the specified format.
+  //
+  // There is one pair of instructions that has 2 operands in the
+  // instruction stream: LD (Ir+d),XXXXh.  This is the indexed
+  // addressing mode of LD (HL),XXXXh.  Conveniently, because of
+  // the way the Z80 itself handles the substitution, the operands
+  // appear in the instruction stream in the same left-to-right
+  // order that we humans read them, so no special-casing is
+  // necessary.
+  //
+  // Similarly, there are indexed addressing modes of some of the CB-group
+  // instructions where the operand actually appears before the final opcode
+  // that specifies the function.  For these instructions, the displacement
+  // byte is simply the first byte after the {DD,FD} and CB bytes; the only
+  // special handling we need to do there is to notice the CB byte and advance
+  // over it.
+  //
+  int opr_byte = 1;
+  if (id->bytes[0] == 0xcb || id->bytes[0] == 0xed) {
+    opr_byte++;
+  } else if (id->bytes[0] == 0xdd || id->bytes[0] == 0xfd) {
+    opr_byte++;
+    if (id->bytes[1] == 0xcb) {
+      opr_byte++;
+    }
+  }
+
+  // opr_byte now points to the first operand byte in the instruction buffer.
+  char *curs, *cp;
+  addrmode_t mode;
+  uint16_t u16;
+  int8_t s8;
+  char op[8];
+  for (curs = id->insn_string; (cp = z80_next_operand(&mode, &curs)) != NULL;) {
+    switch (mode) {
+      case amz80_u16:
+        u16 = read_u16le(id->bytes, opr_byte);
+        sprintf(op, "%04X", u16);
+        memcpy(cp, op, 4);
+        break;
+
+      case amz80_u8:
+        sprintf(op, "%02X", id->bytes[opr_byte]);
+        memcpy(cp, op, 2);
+        break;
+
+      case amz80_pcrel8:
+        // No punctuation after PC-relative offsets.  Also, note that the
+        // value stored in the instruction stream is atually "target - 2".
+        s8 = (int8_t)id->bytes[opr_byte] + 2; // sign-extend
+        sprintf(op, "%-4d", (int8_t)id->bytes[opr_byte]);
+        memcpy(cp, op, 4);
+        id->resolved_address = id->insn_address + s8;
+        id->resolved_address_valid = true;
+        break;
+
+      case amz80_disp8:
+        //
+        // This one is a little annoying.  We save it in the template as
+        // "+ddd".  But, for a negative displacement (it's defined to be a
+        // twos-complement number), we really want to display it as "-ddd".
+        // Furthermore, we don't want to display extra digits, but there's
+        // always punctuation (the closing ")") after the displacement value.
+        //
+        s8 = (int8_t)id->bytes[opr_byte];
+        if (s8 < 0) {
+          sprintf(op, "%-4d", s8);
+          memcpy(cp, op, 4);
+        } else {
+          sprintf(op, "%-3d", s8);
+          memcpy(cp + 1, op, 3);
+        }
+        for (; *cp != ' ' && *cp != '\0'; cp++) {
+          // advance to the whitespace.
+        }
+        if (*cp == ' ') {
+          char *ncp;
+          for (ncp = cp; *ncp == ' '; ncp++) {
+            // advance past the whitespace
+          }
+          while ((*cp++ = *ncp++) != '\0') {
+            // collapse the whitespace.
+          }
+        }
+        break;
+
+      default:
+        break;
+    }
+    opr_byte += z80_operand_size(mode);
+  }
+}
+
+void
 insn_decode_next_state_z80(struct insn_decode *id)
 {
   if (id->state != ds_fetching || id->bytes_fetched == 0) {
@@ -849,7 +948,29 @@ insn_decode_next_state_z80(struct insn_decode *id)
       return;
     }
 
-    // XXX Calculate bytes required now that we how the operand types.
+    //
+    // OK, we have the insn template, and therefore know all of the
+    // operand types.  We can now calculate how many bytes are required
+    // to decode the entire instruction.
+    //
+    // First, account for the opcode bytes.
+    //
+    id->bytes_required = 1;
+    if (id->bytes[0] == 0xcb || id->bytes[0] == 0xed) {
+      id->bytes_required++;
+    } else if (id->bytes[0] == 0xdd || id->bytes[0] == 0xfd) {
+      id->bytes_required++;
+      if (id->bytes_fetched >= 2 && id->bytes[1] == 0xcb) {
+        id->bytes_required++;
+      }
+    }
+
+    // Now add up the bytes for the operands.
+    char *curs, *cp;
+    addrmode_t mode;
+    for (curs = id->insn_string; (cp = z80_next_operand(&mode, &curs)) != NULL;) {
+      id->bytes_required += z80_operand_size(mode);
+    }
   }
 
   // If we've now fetched the number of required bytes, we can
@@ -859,7 +980,6 @@ insn_decode_next_state_z80(struct insn_decode *id)
     id->state = ds_complete;
   }
 }
-#endif
 
 //
 // 6809 instruction decoding
@@ -2522,6 +2642,10 @@ insn_decode_init(struct insn_decode *id)
     case cpu_6809:
     case cpu_6809e:
       id->next_state = insn_decode_next_state_6809;
+      break;
+
+    case cpu_z80:
+      id->next_state = insn_decode_next_state_z80;
       break;
 
     default:
