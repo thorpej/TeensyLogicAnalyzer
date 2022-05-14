@@ -634,7 +634,7 @@ z80_next_operand(addrmode_t *modep, char **cursor)
     cp = strstr(cur, z80_operand_types[i].opr_string);
     if (cp != NULL) {
       // Found one!  Advance the cursor beyond it.
-      cur += strlen(z80_operand_types[i].opr_string);
+      cur = cp + strlen(z80_operand_types[i].opr_string);
       *cursor = cur;
       if (modep != NULL) {
         *modep = z80_operand_types[i].opr_mode;
@@ -947,6 +947,8 @@ insn_decode_next_state_z80(struct insn_decode *id)
     if (! z80_insn_template(id)) {
       return;
     }
+    // Serial.print("Got template: ");
+    // Serial.println(id->insn_string);
 
     //
     // OK, we have the insn template, and therefore know all of the
@@ -969,8 +971,14 @@ insn_decode_next_state_z80(struct insn_decode *id)
     char *curs, *cp;
     addrmode_t mode;
     for (curs = id->insn_string; (cp = z80_next_operand(&mode, &curs)) != NULL;) {
+      // Serial.print("  Cursor: ");
+      // Serial.println(curs);
+      // Serial.print("  Operand: ");
+      // Serial.println(cp);
       id->bytes_required += z80_operand_size(mode);
     }
+    // Serial.print("  Bytes required: ");
+    // Serial.println(id->bytes_required, DEC);
   }
 
   // If we've now fetched the number of required bytes, we can
@@ -1833,21 +1841,21 @@ const uint32_t debug_address[] = {
   0x1006, 0x1007,
 };
 
-#define N (CC_6502_RW | CC_6502_RESET | CC_6502_NMI | CC_6502_IRQ)
-#define F (CC_6502_SYNC | N)
+#define N   (CC_6502_RW | CC_6502_RESET | CC_6502_NMI | CC_6502_IRQ)
+#define FN  (CC_6502_SYNC | N)
 
 const uint32_t debug_control[] = {
   // BRK
-  F,
+  FN,
 
   // ORA $20
-  F, N,
+  FN, N,
 
   // LDY $3000
-  F, N, N,
+  FN, N, N,
 
   // BPL 16
-  F, N,
+  FN, N,
 };
 
 #undef N
@@ -2234,7 +2242,249 @@ const uint32_t debug_control[] = {
 #ifdef DEBUG_6800
 #endif // DEBUG_6800
 
+#define DEBUG_Z80
 #ifdef DEBUG_Z80
+#define DEBUG_CPU             cpu_z80
+
+// Main goal of the 6809E debug data is to exercise the instruction decoder.
+// Most of these samples are not cycle-accurate in any way, shape, or form.
+//
+// Pretty much just going down the list from the data sheet "UM008011-0816".
+const uint32_t debug_data[] = {
+  // LD A,B
+  0b01111000,
+
+  // LD C,55h
+  0b00001110,
+  0x55,
+
+  // LD D,(HL)
+  0b01010110,
+
+  // LD E,(IX+5)
+  0xdd,
+  0b01011110,
+  5,
+
+  // LD H,(IY-10)
+  0xfd,
+  0b01100110,
+  0xf6,
+
+  // LD (HL),A
+  0b01110111,
+
+  // LD (IX+127),L
+  0xdd,
+  0b01110101,
+  127,
+
+  // LD (IY-100),A
+  0xfd,
+  0b01110111,
+  0x9c,
+
+  // LD (HL),FFh
+  0x36,
+  0xff,
+
+  // LD (IX+10),A5h
+  0xdd,
+  0x36,
+  10,
+  0xa5,
+
+  // LD A,(BC)
+  0x0a,
+
+  // LD A,(DE)
+  0x1a,
+
+  // LD A,(1234h)
+  0x3a,
+  0x34,
+  0x12,
+
+  // LD (BC),A
+  0x02,
+
+  // LD (DE),A
+  0x12,
+
+  // LD (0x4567),A
+  0x32,
+  0x67,
+  0x45,
+
+  // LD A,I
+  0xed,
+  0x57,
+
+  // LD A,R
+  0xed,
+  0x5f,
+
+  // LD I,A
+  0xed,
+  0x47,
+
+  // LD R,A
+  0xed,
+  0x4f,
+};
+
+const uint32_t debug_address[] = {
+  // LD A,B
+  0x1000,
+
+  // LD C,55h
+  0x1001,
+  0x1002,
+
+  // LD D,(HL)
+  0x1003,
+
+  // LD E,(IX+5)
+  0x1004,
+  0x1005,
+  0x1006,
+
+  // LD H,(IY-10)
+  0x1007,
+  0x1008,
+  0x1009,
+
+  // LD (HL),A
+  0x100a,
+
+  // LD (IX+127),L
+  0x100b,
+  0x100c,
+  0x100d,
+
+  // LD (IY-100),A
+  0x100e,
+  0x100f,
+  0x1010,
+
+  // LD (HL),FFh
+  0x1011,
+  0x1012,
+
+  // LD (IX+10),A5h
+  0x1013,
+  0x1014,
+  0x1015,
+  0x1016,
+
+  // LD A,(BC)
+  0x1017,
+
+  // LD A,(DE)
+  0x1018,
+
+  // LD A,(1234h)
+  0x1019,
+  0x101a,
+  0x101b,
+
+  // LD (BC),A
+  0x101c,
+
+  // LD (DE),A
+  0x101d,
+
+  // LD (0x4567),A
+  0x101e,
+  0x101f,
+  0x1020,
+
+  // LD A,I
+  0x1021,
+  0x1022,
+
+  // LD A,R
+  0x1023,
+  0x1024,
+
+  // LD I,A
+  0x1025,
+  0x1026,
+
+  // LD R,A
+  0x1027,
+  0x1028,
+};
+
+#define FN  (CC_Z80_IORQ | CC_Z80_WR | CC_Z80_RESET | CC_Z80_INT)
+#define N   (CC_Z80_IORQ | CC_Z80_WR | CC_Z80_RESET | CC_Z80_INT | CC_Z80_M1)
+#define NW  (CC_Z80_IORQ | CC_Z80_RD | CC_Z80_RESET | CC_Z80_INT | CC_Z80_M1)
+
+const uint32_t debug_control[] = {
+  // LD A,B
+  FN,
+
+  // LD C,55h
+  FN, N,
+
+  // LD C,(HL)
+  FN,
+
+  // LD E(IX+5)
+  FN, N, N,
+
+  // LD H,(IY-10)
+  FN, N, N,
+
+  // LD (HL),A
+  FN,
+
+  // LD (IX+127),L
+  FN, N, N,
+
+  // LD (IY-100),A
+  FN, N, N,
+
+  // LD (HL),FFh
+  FN, N,
+
+  // LD (IX+10),A5h
+  FN, N, N, N,
+
+  // LD A,(BC)
+  FN,
+
+  // LD A,(DE)
+  FN,
+
+  // LD A,(1234h)
+  FN, N, N,
+
+  // LD (BC),A
+  FN,
+
+  // LD (DE),A
+  FN,
+
+  // LD (0x4567),A
+  FN, N, N,
+
+  // LD A,I
+  FN, N,
+
+  // LD A,R
+  FN, N,
+
+  // LD I,A
+  FN, N,
+
+  // LD R,A
+  FN, N,
+};
+
+#undef F
+#undef N
+#undef NW
 #endif // DEBUG_Z80
 
 #if defined(DEBUG_6502) || defined(DEBUG_6809) || defined(DEBUG_6809E) || \
