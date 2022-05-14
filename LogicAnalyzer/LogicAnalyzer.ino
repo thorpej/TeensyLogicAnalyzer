@@ -1834,22 +1834,24 @@ const uint32_t debug_address[] = {
 };
 
 #define N (CC_6502_RW | CC_6502_RESET | CC_6502_NMI | CC_6502_IRQ)
+#define F (CC_6502_SYNC | N)
 
 const uint32_t debug_control[] = {
   // BRK
-  CC_6502_SYNC | N,
+  F,
 
   // ORA $20
-  CC_6502_SYNC | N, N,
+  F, N,
 
   // LDY $3000
-  CC_6502_SYNC | N, N, N,
+  F, N, N,
 
   // BPL 16
-  CC_6502_SYNC | N, N,
+  F, N,
 };
 
 #undef N
+#undef F
 #endif // DEBUG_6502
 
 #ifdef DEBUG_6809
@@ -2100,104 +2102,107 @@ const uint32_t debug_address[] = {
 };
 
 #define N   (CC_6809_RW | CC_6809_IRQ | CC_6809_FIRQ | CC_6809_NMI | CC_6809_RESET)
+#define NW  (CC_6809_IRQ | CC_6809_FIRQ | CC_6809_NMI | CC_6809_RESET)
 #define VMA (CC_6809_RW | CC_6809_IRQ | CC_6809_FIRQ | CC_6809_NMI | CC_6809_RESET)
+#define L   (CC_6809E_LIC | N)
+#define NWL (CC_6809E_LIC | NW)
 
 const uint32_t debug_control[] = {
   // Dummy sample, just to set LIC
-  CC_6809E_LIC | N,
+  L,
 
   // Inherent addressing mode: NEGA
-  CC_6809E_LIC | N,
+  L,
 
   // Direct addressing mode: INC < $10
-  N, CC_6809E_LIC | N,
+  N, L,
 
   // Relative addressing mode: BRA -3
-  N, CC_6809E_LIC | N,
+  N, L,
 
   // Extended addressing mode: ASR $CAFE
-  N, N, CC_6809E_LIC | N,
+  N, N, L,
 
   // Immediate addressing mode: ORA #$5A
-  N, CC_6809E_LIC | N,
+  N, L,
 
   // Indexed zero-offset: LEAX ,X
-  N, CC_6809E_LIC | N,
+  N, L,
 
   // Indexed zero-offset indirect: LEAX [,X]
-  N, CC_6809E_LIC | N,
+  N, L,
 
   // Indexed 5-bit constant offset: LEAY 1,Y
-  N, CC_6809E_LIC | N,
+  N, L,
 
   // Indexed 8-bit constant offset: LEAS -64,S
-  N, N, CC_6809E_LIC | N,
+  N, N, L,
 
   // Indexed 8-bit constant offset indirect: LEAU [-64,U]
-  N, N, CC_6809E_LIC | N,
+  N, N, L,
 
   // Indexed 16-bit constant offset: SUBA 384,Y
-  N, N, N, CC_6809E_LIC | N,
+  N, N, N, L,
 
   // Indexed 16-bit constant offset indirect: LDA [1024,X]
-  N, N, N, CC_6809E_LIC | N,
+  N, N, N, L,
 
   // Indexed accumulator offset: STA A,U
-  N, CC_6809E_LIC | N,
+  N, L,
 
   // Indexed accumulator offset indirect: STA [A,U]
-  N, CC_6809E_LIC | N,
+  N, L,
 
   // Indexed accumulator offset: ORA B,Y
-  N, CC_6809E_LIC | N,
+  N, L,
 
   // Indexed accumulator offset: CMPX D,S
-  N, CC_6809E_LIC | N,
+  N, L,
 
   // Indexed Auto Increment by 1: LDA ,X+
-  N, CC_6809E_LIC | N,
+  N, L,
 
   // Indexed Auto Increment by 2: LDY ,X++
-  N, N, CC_6809E_LIC | N,
+  N, N, L,
 
   // Indexed Auto Increment by 2 indirect: LDY [,X++]
-  N, N, CC_6809E_LIC | N,
+  N, N, L,
 
   // Indexed Auto Decrement by 1: LDA ,-X
-  N, CC_6809E_LIC | N,
+  N, L,
 
   // Indexed Auto Decrement by 2: LDY ,--X
-  N, N, CC_6809E_LIC | N,
+  N, N, L,
 
   // Indexed Auto Decrement by 2 indirect: LDY [,--X]
-  N, N, CC_6809E_LIC | N,
+  N, N, L,
 
   // Indexed constant 8-bit offset from PC: LDB 10,PCR
-  N, N, CC_6809E_LIC | N,
+  N, N, L,
 
   // Indexed constant 8-bit offset from PC indirect: LDB [10,PCR]
-  N, N, CC_6809E_LIC | N,
+  N, N, L,
 
   // Indexed constant 16-bit offset from PC: LDB 32767,PCR
-  N, N, N, CC_6809E_LIC | N,
+  N, N, N, L,
 
   // Indexed constant 16-bit offset from PC indirect: LDB 32767,PCR
-  N, N, N, CC_6809E_LIC | N,
+  N, N, N, L,
 
   // Extended indirect addressing mode: BITA [$CAFE]
-  N, N, N, CC_6809E_LIC | N,
+  N, N, N, L,
 
   // TFR D,U
-  N, CC_6809E_LIC | N,
+  N, L,
 
   // EXG X,DPR
-  N, CC_6809E_LIC | N,
+  N, L,
 
   // PSHS A,B,U
-  N, CC_6809E_LIC | N,
+  N, L,
 
   // PULU S
-  N, CC_6809E_LIC | N,
+  N, L,
 
   // Dummy IRQ vector
   N & ~CC_6809_IRQ, N & ~CC_6809_IRQ,
@@ -2210,18 +2215,20 @@ const uint32_t debug_control[] = {
   VMA, VMA,
   N,
   VMA,
-  N  & ~CC_6809_RW, (N & ~CC_6809_RW) | CC_6809E_LIC,
+  NW, NWL,
 
   // DEC example cycle-by-cycle flow from 6809E data sheet
   N, N, N,
   VMA,
   N,
   VMA,
-  (N & ~CC_6809_RW) | CC_6809E_LIC,
+  NWL,
 };
 
 #undef N
 #undef VMA
+#undef L
+#undef NWL
 #endif // DEBUG_6809E
 
 #ifdef DEBUG_6800
