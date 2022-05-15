@@ -40,7 +40,7 @@ const char *verboseVersionStringAdditions = " by Jason R. Thorpe <thorpej@me.com
 const char *origVersionString = "Based on Logic Analyzer version 0.30 by Jeff Tranter <tranter@pobox.com>";
 
 // Trigger and CPU type definitions
-typedef enum { tr_address, tr_io, tr_data, tr_reset, tr_irq, tr_firq, tr_nmi, tr_none } trigger_t;
+typedef enum { tr_address, tr_io, tr_data, tr_addr_data, tr_reset, tr_irq, tr_firq, tr_nmi, tr_none } trigger_t;
 typedef enum { tr_read, tr_write, tr_either } cycle_t;
 typedef enum { cpu_none, cpu_6502, cpu_65c02, cpu_6800, cpu_6809, cpu_6809e, cpu_z80 } cpu_t;
 
@@ -3517,6 +3517,23 @@ show_trigger(void)
           break;
       }
       break;
+    case tr_addr_data:
+      Serial.print("on address ");
+      Serial.print(triggerAddress, HEX);
+      Serial.print(" and data ");
+      Serial.print(triggerData, HEX);
+      switch (triggerCycle) {
+        case tr_read:
+          Serial.println(" read");
+          break;
+        case tr_write:
+          Serial.println(" write");
+          break;
+        case tr_either:
+          Serial.println(" read or write");
+          break;
+      }
+      break;
     case tr_reset:
       Serial.print("on /RESET ");
       Serial.println(triggerLevel ? "high" : "low");
@@ -3570,45 +3587,46 @@ help(void)
   show_pretrigger();
 
   Serial.println("Commands:");
-  Serial.println("c <cpu>              - Set CPU.  Valid types:");
-  Serial.println("                          6502 65C02");
-  Serial.println("                          6800");
-  Serial.println("                          6809");
-  Serial.println("                          6809E");
-  Serial.println("                          Z80");
-  Serial.println("c                    - Show current CPU");
-  Serial.println("s <number>           - Set number of samples");
-  Serial.println("s                    - Show current number of samples");
-  Serial.println("p <samples>          - Set pre-trigger samples");
-  Serial.println("p                    - Show current pre-trigger samples");
-  Serial.println("t a <address> [r|w]  - Trigger on address");
+  Serial.println("c <cpu>                     - Set CPU.  Valid types:");
+  Serial.println("                                 6502 65C02");
+  Serial.println("                                 6800");
+  Serial.println("                                 6809");
+  Serial.println("                                 6809E");
+  Serial.println("                                 Z80");
+  Serial.println("c                           - Show current CPU");
+  Serial.println("s <number>                  - Set number of samples");
+  Serial.println("s                           - Show current number of samples");
+  Serial.println("p <samples>                 - Set pre-trigger samples");
+  Serial.println("p                           - Show current pre-trigger samples");
+  Serial.println("t a <address> [r|w]         - Trigger on address");
   if (cpu == cpu_z80) {
-    Serial.println("t i <address> [r|w]  - Trigger on i/o address");
+    Serial.println("t i <address> [r|w]         - Trigger on i/o address");
   }
-  Serial.println("t d <data> [r|w]     - Trigger on data");
+  Serial.println("t d <data> [r|w]            - Trigger on data");
+  Serial.println("t ad <address> <data> [r|w] - Trigger on address and data");
   if (cpu != cpu_none) {
-    Serial.println("t reset 0|1          - Trigger on /RESET level");
+    Serial.println("t reset 0|1                 - Trigger on /RESET level");
     if (cpu == cpu_z80) {
-      Serial.println("t int 0|1            - Trigger on /INT level");
+      Serial.println("t int 0|1                   - Trigger on /INT level");
     } else {
-      Serial.println("t irq 0|1            - Trigger on /IRQ level");
+      Serial.println("t irq 0|1                   - Trigger on /IRQ level");
     }
     if (cpu == cpu_6809 || cpu == cpu_6809e) {
-      Serial.println("t firq 0|1           - Trigger on /FIRQ level");
+      Serial.println("t firq 0|1                  - Trigger on /FIRQ level");
     }
-    Serial.println("t nmi 0|1            - Trigger on /NMI level");
+    Serial.println("t nmi 0|1                   - Trigger on /NMI level");
   }
-  Serial.println("t none               - Trigger freerun");
-  Serial.println("t                    - Show current trigger");
-  Serial.println("g                    - Go/start analyzer");
-  Serial.println("l [start] [end]      - List samples");
-  Serial.println("e                    - Export samples as CSV");
-  Serial.println("w                    - Write data to SD card");
-  Serial.println("d <address>          - Decode instruction at address");
+  Serial.println("t none                      - Trigger freerun");
+  Serial.println("t                           - Show current trigger");
+  Serial.println("g                           - Go/start analyzer");
+  Serial.println("l [start] [end]             - List samples");
+  Serial.println("e                           - Export samples as CSV");
+  Serial.println("w                           - Write data to SD card");
+  Serial.println("d <address>                 - Decode instruction at address");
 #ifdef DEBUG_SAMPLES
-  Serial.println("D                    - Load debug sample data");
+  Serial.println("D                           - Load debug sample data");
 #endif
-  Serial.println("h or ?               - Show command usage");
+  Serial.println("h or ?                      - Show command usage");
   if (cpu == cpu_none) {
     Serial.println("");
     Serial.println("Select a CPU type to see additional trigger options.");
@@ -4217,11 +4235,25 @@ go(void)
   if (cpu == cpu_none) {
     Serial.println("No CPU type selected!");
   }
-  
+
   // Scramble the trigger address, control, and data lines to match what we will read on the ports.
-  if (triggerMode == tr_address) {
-    aTriggerBits = scramble_CAxx(triggerAddress);
-    aTriggerMask = scramble_CAxx(0xffff);
+
+  if (triggerMode == tr_address || triggerMode == tr_data ||
+      triggerMode == tr_addr_data ||
+      triggerMode == tr_io) {
+
+    if (triggerMode == tr_address || triggerMode == tr_addr_data) {
+      aTriggerBits = scramble_CAxx(triggerAddress);
+      aTriggerMask = scramble_CAxx(0xffff);
+    }
+    if (triggerMode == tr_data || triggerMode == tr_addr_data) {
+      dTriggerBits = scramble_CDxx(triggerData);
+      dTriggerMask = scramble_CDxx(0xff);
+    }
+    if (triggerMode == tr_io) {
+      aTriggerBits = scramble_CAxx(triggerAddress);
+      aTriggerMask = scramble_CAxx(0xff);
+    }
 
     // Check for r/w qualifer
     if (cpu != cpu_z80) {
@@ -4234,7 +4266,11 @@ go(void)
       uint32_t tmask, tbits;
 
       tmask = CC_Z80_MREQ | CC_Z80_IORQ;
-      tbits = CC_Z80_IORQ;                // Memory cycle
+      if (triggerMode == tr_io) {
+        tbits = CC_Z80_MREQ;              // I/O cycle
+      } else {
+        tbits = CC_Z80_IORQ;              // Memory cycle
+      }
       if (triggerCycle == tr_read) {
         tmask |= CC_Z80_RD | CC_Z80_WR;
         tbits |= CC_Z80_WR;               // Read cycle
@@ -4245,56 +4281,6 @@ go(void)
       cTriggerMask = scramble_CCxx(tmask, &aTriggerMask, &dTriggerMask);
       cTriggerBits = scramble_CCxx(tbits, &aTriggerBits, &dTriggerBits);
     }
-  } else if (triggerMode == tr_data) {
-    dTriggerBits = scramble_CDxx(triggerData);
-    dTriggerMask = scramble_CDxx(0xff);
-
-    // Check for r/w qualifier
-    if (cpu != cpu_z80) {
-      // 6502, 6800, 6809 -- all 6800-like
-      cTriggerMask = scramble_CCxx(CC_6800_RW, &aTriggerMask, &dTriggerMask);
-      if (triggerCycle == tr_read) {
-        cTriggerBits = scramble_CCxx(CC_6800_RW, &aTriggerBits, &dTriggerBits);
-      }
-    } else {
-      uint32_t tmask, tbits;
-
-      // XXX Do we want to qualify "memory data" vs "I/O data"?
-
-      tmask = CC_Z80_MREQ | CC_Z80_IORQ;
-      tbits = CC_Z80_IORQ;                // Memory cycle
-      if (triggerCycle == tr_read) {
-        tmask |= CC_Z80_RD | CC_Z80_WR;
-        tbits |= CC_Z80_WR;               // Read cycle
-      } else if (triggerCycle == tr_write) {
-        tmask |= CC_Z80_RD | CC_Z80_WR;
-        tbits |= CC_Z80_RD;               // Write cycle
-      }
-      cTriggerMask = scramble_CCxx(tmask, &aTriggerMask, &dTriggerMask);
-      cTriggerBits = scramble_CCxx(tbits, &aTriggerBits, &dTriggerBits);
-    }
-
-  } else if (triggerMode == tr_io) {
-    aTriggerBits = scramble_CAxx(triggerAddress);
-    aTriggerMask = scramble_CAxx(0xff);
-
-    if (cpu == cpu_z80) {
-      uint32_t tmask, tbits;
-
-      tmask = CC_Z80_MREQ | CC_Z80_IORQ;
-      tbits = CC_Z80_MREQ;                // I/O cycle
-      if (triggerCycle == tr_read) {
-        tmask |= CC_Z80_RD | CC_Z80_WR;
-        tbits |= CC_Z80_WR;               // Read cycle
-      } else if (triggerCycle == tr_write) {
-        tmask |= CC_Z80_RD | CC_Z80_WR;
-        tbits |= CC_Z80_RD;               // Write cycle
-      }
-      cTriggerMask = scramble_CCxx(tmask, &aTriggerMask, &dTriggerMask);
-      cTriggerBits = scramble_CCxx(tbits, &aTriggerBits, &dTriggerBits);
-    }
-
-  // TODO: Add support other Z80 control line triggers.
 
   } else if (triggerMode == tr_reset) {
     if (cpu != cpu_z80) {
@@ -4322,6 +4308,8 @@ go(void)
       which_c_trigger = CC_Z80_NMI;
     }
   }
+  // TODO: Add support other Z80 control line triggers.
+
   // If a control signal trigger was specified, encode it.
   if (which_c_trigger) {
     cTriggerMask = scramble_CCxx(which_c_trigger, &aTriggerMask, &dTriggerMask);
@@ -4568,6 +4556,27 @@ loop(void) {
         }
       } else {
         Serial.println("Invalid data, must be between 0 and FF.");
+      }
+    } else if (cmd.startsWith("t ad ")) {
+      int n = strtol(cmd.substring(5, 9).c_str(), NULL, 16);
+      if ((n >= 0) && (n <= 0xffff)) {
+        triggerAddress = n;
+        n = strtol(cmd.substring(10, 12).c_str(), NULL, 16);
+        if ((n >= 0) && (n <= 0xff)) {
+          triggerData = n;
+          triggerMode = tr_addr_data;
+          if ((cmd.length() == 14) && cmd.endsWith('r')) {
+            triggerCycle = tr_read;
+          } else if ((cmd.length() == 14) && cmd.endsWith('w')) {
+            triggerCycle = tr_write;
+          } else {
+            triggerCycle = tr_either;
+          }
+        } else {
+          Serial.println("Invalid data, must be between 0 and FF.");
+        }
+      } else {
+        Serial.println("Invalid address, must be between 0 and FFFF.");
       }
     } else if (cmd.startsWith("t i ")) {
       int n = strtol(cmd.substring(4, 6).c_str(), NULL, 16);
