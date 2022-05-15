@@ -4222,7 +4222,19 @@ go(void)
         cTriggerBits = scramble_CCxx(CC_6800_RW, &aTriggerBits, &dTriggerBits);
       }
     } else {
-      // TODO: r/w qualifier for Z80
+      uint32_t tmask, tbits;
+
+      tmask = CC_Z80_MREQ | CC_Z80_IORQ;
+      tbits = CC_Z80_IORQ;                // Memory cycle
+      if (triggerCycle == tr_read) {
+        tmask |= CC_Z80_RD | CC_Z80_WR;
+        tbits |= CC_Z80_WR;               // Read cycle
+      } else if (triggerCycle == tr_write) {
+        tmask |= CC_Z80_RD | CC_Z80_WR;
+        tbits |= CC_Z80_RD;               // Write cycle
+      }
+      cTriggerMask = scramble_CCxx(tmask, &aTriggerMask, &dTriggerMask);
+      cTriggerBits = scramble_CCxx(tbits, &aTriggerBits, &dTriggerBits);
     }
   } else if (triggerMode == tr_data) {
     dTriggerBits = scramble_CDxx(triggerAddress);
@@ -4236,7 +4248,19 @@ go(void)
         cTriggerBits = scramble_CCxx(CC_6800_RW, &aTriggerBits, &dTriggerBits);
       }
     } else {
-      // TODO: r/w qualifier for Z80
+      uint32_t tmask, tbits;
+
+      tmask = CC_Z80_MREQ | CC_Z80_IORQ;
+      tbits = CC_Z80_IORQ;                // Memory cycle
+      if (triggerCycle == tr_read) {
+        tmask |= CC_Z80_RD | CC_Z80_WR;
+        tbits |= CC_Z80_WR;               // Read cycle
+      } else if (triggerCycle == tr_write) {
+        tmask |= CC_Z80_RD | CC_Z80_WR;
+        tbits |= CC_Z80_RD;               // Write cycle
+      }
+      cTriggerMask = scramble_CCxx(tmask, &aTriggerMask, &dTriggerMask);
+      cTriggerBits = scramble_CCxx(tbits, &aTriggerBits, &dTriggerBits);
     }
 
     // TODO: Add support for Z80 I/O read or write trigger.
