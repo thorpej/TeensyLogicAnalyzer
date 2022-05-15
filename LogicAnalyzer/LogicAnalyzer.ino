@@ -2253,7 +2253,7 @@ const uint32_t debug_control[] = {
 #ifdef DEBUG_Z80
 #define DEBUG_CPU             cpu_z80
 
-// Main goal of the 6809E debug data is to exercise the instruction decoder.
+// Main goal of the Z80 debug data is to exercise the instruction decoder.
 // Most of these samples are not cycle-accurate in any way, shape, or form.
 //
 // Pretty much just going down the list from the data sheet "UM008011-0816".
@@ -2434,6 +2434,58 @@ const uint32_t debug_data[] = {
   // POP IY
   0xfd,
   0xe1,
+
+  // EX DE,HL
+  0xeb,
+
+  // EX AF,AF'
+  0x08,
+
+  // EXX
+  0xd9,
+
+  // EX (SP),HL
+  0xe3,
+
+  // EX (SP),IX
+  0xdd,
+  0xe3,
+
+  // EX (SP),IY
+  0xfd,
+  0xe3,
+
+  // LDI
+  0xed,
+  0xa0,
+
+  // LDIR
+  0xed,
+  0xb0,
+
+  // LDD
+  0xed,
+  0xa8,
+
+  // LDDR
+  0xed,
+  0xb8,
+
+  // CPI
+  0xed,
+  0xa1,
+
+  // CPIR
+  0xed,
+  0xb1,
+
+  // CPD
+  0xed,
+  0xa9,
+
+  // CPDR
+  0xed,
+  0xb9,
 };
 
 const uint32_t debug_address[] = {
@@ -2613,6 +2665,58 @@ const uint32_t debug_address[] = {
   // POP IY
   0x105f,
   0x1060,
+
+  // EX DE,HL
+  0x1061,
+
+  // EX AF,AF'
+  0x1062,
+
+  // EXX
+  0x1063,
+
+  // EX (SP),HL
+  0x1064,
+
+  // EX (SP),IX
+  0x1065,
+  0x1066,
+
+  // EX (SP),IY
+  0x1067,
+  0x1068,
+
+  // LDI
+  0x1069,
+  0x106a,
+
+  // LDIR
+  0x106b,
+  0x106c,
+
+  // LDD
+  0x106d,
+  0x106e,
+
+  // LDDR
+  0x106f,
+  0x1070,
+
+  // CPI
+  0x1071,
+  0x1072,
+
+  // CPIR
+  0x1073,
+  0x1074,
+
+  // CPD
+  0x1075,
+  0x1076,
+
+  // CPDR
+  0x1077,
+  0x1078,
 };
 
 #define FN  (CC_Z80_IORQ | CC_Z80_WR | CC_Z80_RESET | CC_Z80_INT)
@@ -2738,6 +2842,48 @@ const uint32_t debug_control[] = {
   FN, N,
 
   // POP IY
+  FN, N,
+
+  // EX DE,HL
+  FN,
+
+  // EX AF,AF'
+  FN,
+
+  // EXX
+  FN,
+
+  // EX (SP),HL
+  FN,
+
+  // EX (SP),IX
+  FN, N,
+
+  // EX (SP),IY
+  FN, N,
+
+  // LDI
+  FN, N,
+
+  // LDIR
+  FN, N,
+
+  // LDD
+  FN, N,
+
+  // LDDR
+  FN, N,
+
+  // CPI
+  FN, N,
+
+  // CPIR
+  FN, N,
+
+  // CPD
+  FN, N,
+
+  // CPDR
   FN, N,
 };
 
