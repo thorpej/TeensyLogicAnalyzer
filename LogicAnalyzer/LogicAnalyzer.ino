@@ -558,8 +558,9 @@ insn_decode_next_state_6800(struct insn_decode *id)
   }
 }
 
-// Instructions for Z80 disassembler.
-// Two-byte extended instructions are not yet supported.
+//
+// Z80 instruction decoding
+//
 const char *opcodes_z80[256] = {
   "NOP",          "LD BC,XXXXh",  "LD (BC),A",    "INC BC",       "INC B",        "DEC B",        "LD B,XXh",     "RLCA",
   "EX AF,AF'",    "ADD HL,BC",    "LD A,(BC)",    "DEC BC",       "INC C",        "DEC C",        "LD C,XXh",     "RRCA",
@@ -668,7 +669,7 @@ z80_hl_to_index(struct insn_decode *id, const char *tmpl, uint8_t opc, uint8_t w
       // No HL to substitute.
       return false;
     }
-    if (c == '(') {
+    if (c == '(' && cp[0] == 'H' && cp[1] == 'L') {
       // Memory reference -- we need a displacement in this case.
       // Except for JP (HL), which is defined as "PC <- HL" and
       // NOT "PC <- (HL)", and thus is, I think, the only irregular
@@ -2337,6 +2338,102 @@ const uint32_t debug_data[] = {
   // LD R,A
   0xed,
   0x4f,
+
+  // LD BC,1234h
+  0b00000001,
+  0x34,
+  0x12,
+
+  // LD IX,4567h
+  0xdd,
+  0b00100001,
+  0x67,
+  0x45,
+
+  // LD IY,CAFEh
+  0xfd,
+  0b00100001,
+  0xfe,
+  0xca,
+
+  // LD HL,(CAFEh)
+  0x2a,
+  0xfe,
+  0xca,
+
+  // LD HL,(BABEh) (alternate HL encoding)
+  0xed,
+  0b01101011,
+  0xbe,
+  0xba,
+
+  // LD IX,(1234h)
+  0xdd,
+  0x2a,
+  0x34,
+  0x12,
+
+  // LD IY,(1234h)
+  0xfd,
+  0x2a,
+  0x34,
+  0x12,
+
+  // LD (1234h),HL
+  0x22,
+  0x34,
+  0x12,
+
+  // LD (4567h),SP
+  0xed,
+  0b01110011,
+  0x67,
+  0x45,
+
+  // LD (CAFEh),IX XXX
+  0xdd,
+  0x22,
+  0xfe,
+  0xca,
+
+  // LD (CAFEh),IY
+  0xfd,
+  0x22,
+  0xfe,
+  0xca,
+
+  // LD SP,HL
+  0xf9,
+
+  // LD SP,IX
+  0xdd,
+  0xf9,
+
+  // LD SP,IY
+  0xfd,
+  0xf9,
+
+  // PUSH BC
+  0b11000101,
+
+  // PUSH IX
+  0xdd,
+  0xe5,
+
+  // PUSH IY
+  0xfd,
+  0xe5,
+
+  // POP AF
+  0b11110001,
+
+  // POP IX
+  0xdd,
+  0xe1,
+
+  // POP IY
+  0xfd,
+  0xe1,
 };
 
 const uint32_t debug_address[] = {
@@ -2420,6 +2517,102 @@ const uint32_t debug_address[] = {
   // LD R,A
   0x1027,
   0x1028,
+
+  // LD BC,1234h
+  0x1029,
+  0x102a,
+  0x102b,
+
+  // LD IX,4567h
+  0x102c,
+  0x102d,
+  0x102e,
+  0x102f,
+
+  // LD IY,CAFEh
+  0x1030,
+  0x1031,
+  0x1032,
+  0x1033,
+
+  // LD HL,(CAFEh)
+  0x1034,
+  0x1035,
+  0x1036,
+
+  // LD HL,(BABEh) (alternate HL encoding)
+  0x1037,
+  0x1038,
+  0x1039,
+  0x103a,
+
+  // LD IX,(1234h)
+  0x103b,
+  0x103c,
+  0x103d,
+  0x103e,
+
+  // LD IY,(1234h)
+  0x103f,
+  0x1040,
+  0x1041,
+  0x1042,
+
+  // LD (1234h),HL
+  0x1043,
+  0x1044,
+  0x1045,
+
+  // LD (4567h),SP
+  0x1046,
+  0x1047,
+  0x1048,
+  0x1049,
+
+  // LD (CAFEh),IX
+  0x104a,
+  0x104b,
+  0x104c,
+  0x104d,
+
+  // LD (CAFEh),IY
+  0x104e,
+  0x104f,
+  0x1050,
+  0x1051,
+
+  // LD SP,HL
+  0x1052,
+
+  // LD SP,IX
+  0x1053,
+  0x1054,
+
+  // LD SP,IY
+  0x1055,
+  0x1056,
+
+  // PUSH BC
+  0x1057,
+
+  // PUSH IX
+  0x1058,
+  0x1059,
+
+  // PUSH IY
+  0x105a,
+  0x105b,
+
+  // POP AF
+  0x105c,
+
+  // POP IX
+  0x105d,
+  0x105e,
+
+  // POP IY
+  0x105f,
+  0x1060,
 };
 
 #define FN  (CC_Z80_IORQ | CC_Z80_WR | CC_Z80_RESET | CC_Z80_INT)
@@ -2485,6 +2678,66 @@ const uint32_t debug_control[] = {
   FN, N,
 
   // LD R,A
+  FN, N,
+
+  // LD BC,1234h
+  FN, N, N,
+
+  // LD IX,4567h
+  FN, N, N, N,
+
+  // LD IY,CAFEh
+  FN, N, N, N,
+
+  // LD HL,(CAFEh)
+  FN, N, N,
+
+  // LD HL,(BABEh) (alternate HL encoding)
+  FN, N, N, N,
+
+  // LD IX,(1234h)
+  FN, N, N, N,
+
+  // LD IY,(1234h)
+  FN, N, N, N,
+
+  // LD (1234h),HL
+  FN, N, N,
+
+  // LD (4567h),SP
+  FN, N, N, N,
+
+  // LD (CAFEh),IX
+  FN, N, N, N,
+
+  // LD (CAFEh),IY
+  FN, N, N, N,
+
+  // LD SP,HL
+  FN,
+
+  // LD SP,IX
+  FN, N,
+
+  // LD SP,IY
+  FN, N,
+
+  // PUSH BC
+  FN,
+
+  // PUSH IX
+  FN, N,
+
+  // PUSH IY
+  FN, N,
+
+  // POP AF
+  FN,
+
+  // POP IX
+  FN, N,
+
+  // POP IY
   FN, N,
 };
 
