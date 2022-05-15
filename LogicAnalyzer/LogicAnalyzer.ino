@@ -669,7 +669,7 @@ z80_hl_to_index(struct insn_decode *id, const char *tmpl, uint8_t opc, uint8_t w
       // No HL to substitute.
       return false;
     }
-    if (c == '(' && cp[0] == 'H' && cp[1] == 'L') {
+    if (c == '(' && t1[0] == 'H' && t1[1] == 'L') {
       // Memory reference -- we need a displacement in this case.
       // Except for JP (HL), which is defined as "PC <- HL" and
       // NOT "PC <- (HL)", and thus is, I think, the only irregular
@@ -864,9 +864,8 @@ insn_decode_format_z80(struct insn_decode *id)
     opr_byte++;
   } else if (id->bytes[0] == 0xdd || id->bytes[0] == 0xfd) {
     opr_byte++;
-    if (id->bytes[1] == 0xcb) {
-      opr_byte++;
-    }
+    // Don't advance for the CB subgroup here because, in that case,
+    // the remainder of the opcode is AFTER the displacement operand.
   }
 
   // opr_byte now points to the first operand byte in the instruction buffer.
@@ -891,8 +890,10 @@ insn_decode_format_z80(struct insn_decode *id)
       case amz80_pcrel8:
         // No punctuation after PC-relative offsets.  Also, note that the
         // value stored in the instruction stream is atually "target - 2".
+        // Z80 assemblers are expected to make the adjustment, so we do the
+        // same for display purposes.
         s8 = (int8_t)id->bytes[opr_byte] + 2; // sign-extend
-        sprintf(op, "%-4d", (int8_t)id->bytes[opr_byte]);
+        sprintf(op, "%-4d", s8);
         memcpy(cp, op, 4);
         id->resolved_address = id->insn_address + s8;
         id->resolved_address_valid = true;
@@ -948,10 +949,6 @@ insn_decode_next_state_z80(struct insn_decode *id)
     if (! z80_insn_template(id)) {
       return;
     }
-#if 0
-    Serial.print("Got template: ");
-    Serial.println(id->insn_string);
-#endif
 
     //
     // OK, we have the insn template, and therefore know all of the
@@ -974,18 +971,8 @@ insn_decode_next_state_z80(struct insn_decode *id)
     char *curs, *cp;
     addrmode_t mode;
     for (curs = id->insn_string; (cp = z80_next_operand(&mode, &curs)) != NULL;) {
-#if 0
-      Serial.print("  Cursor: ");
-      Serial.println(curs);
-      Serial.print("  Operand: ");
-      Serial.println(cp);
-#endif
       id->bytes_required += z80_operand_size(mode);
     }
-#if 0
-    Serial.print("  Bytes required: ");
-    Serial.println(id->bytes_required, DEC);
-#endif
   }
 
   // If we've now fetched the number of required bytes, we can
@@ -2486,6 +2473,129 @@ const uint32_t debug_data[] = {
   // CPDR
   0xed,
   0xb9,
+
+  // ADD B
+  0b10000000,
+
+  // ADD 10h
+  0xc6,
+  0x10,
+
+  // ADD (HL)
+  0x86,
+
+  // ADD (IX+100)
+  0xdd,
+  0x86,
+  100,
+
+  // ADC C
+  0b10001001,
+
+  // SUB (HL)
+  0x96,
+
+  // SBC (IY+8)
+  0xfd,
+  0x9e,
+  8,
+
+  // ADD HL,SP
+  0b00111001,
+
+  // ADC HL,SP
+  0xed,
+  0b01111010,
+
+  // SBC HL,SP
+  0xed,
+  0b01110010,
+
+  // ADD IX,IX
+  0xdd,
+  0b00101001,
+
+  // ADD IY,IY
+  0xfd,
+  0b00101001,
+
+  // INC BC
+  0b00000011,
+
+  // INC IY
+  0xfd,
+  0x23,
+
+  // RLCA
+  0x07,
+
+  // RLC B
+  0xcb,
+  0b00000000,
+
+  // RLC (IX+10)
+  0xdd,
+  0xcb,
+  10,
+  0x06,
+
+  // BIT 1,L
+  0xcb,
+  0b01001101,
+
+  // BIT 6,(IX+0)
+  0xdd,
+  0xcb,
+  0,
+  0b01110110,
+
+  // JP BEEFh
+  0xc3,
+  0xef,
+  0xbe,
+
+  // JP Z,DEADh
+  0b11001010,
+  0xad,
+  0xde,
+
+  // JR 2 <10A6h>
+  0x18,
+  0x00,
+
+  // JR 0 <10A6h>
+  0x18,
+  0xfe,
+
+  // JR -2 <10A6h>
+  0x18,
+  0xfc,
+
+  // JP (HL)
+  0xe9,
+
+  // JP (IX)
+  0xdd,
+  0xe9,
+
+  // RETI
+  0xed,
+  0x4d,
+
+  // RST 18h
+  0b11011111,
+
+  // IN A,(10h)
+  0xdb,
+  0x10,
+
+  // IN C,(C)
+  0xed,
+  0b01001000,
+
+  // OUT (C),H
+  0xed,
+  0b01100001,
 };
 
 const uint32_t debug_address[] = {
@@ -2717,6 +2827,129 @@ const uint32_t debug_address[] = {
   // CPDR
   0x1077,
   0x1078,
+
+  // ADD B
+  0x1079,
+
+  // ADD 10h
+  0x107a,
+  0x107b,
+
+  // ADD (HL)
+  0x107c,
+
+  // ADD (IX+100)
+  0x107d,
+  0x107e,
+  0x107f,
+
+  // ADC C
+  0x1080,
+
+  // SUB (HL)
+  0x1081,
+
+  // SBC (IY+8),
+  0x1082,
+  0x1083,
+  0x1084,
+
+  // ADD HL,SP
+  0x1085,
+
+  // ADC HL,SP
+  0x1086,
+  0x1087,
+
+  // SBC HL,SP
+  0x1088,
+  0x1089,
+
+  // ADD IX,IX
+  0x108a,
+  0x108b,
+
+  // ADD IY,IY
+  0x108c,
+  0x108d,
+
+  // INC BC
+  0x108e,
+
+  // INC IY
+  0x108f,
+  0x1090,
+
+  // RLCA
+  0x0191,
+
+  // RLC B
+  0x1092,
+  0x1093,
+
+  // RLC (IX+10)
+  0x1094,
+  0x1095,
+  0x1096,
+  0x1097,
+
+  // BIT 1,L
+  0x1098,
+  0x1099,
+
+  // BIT 6,(IX+0)
+  0x109a,
+  0x109b,
+  0x109c,
+  0x109d,
+
+  // JP BEEFh
+  0x109e,
+  0x109f,
+  0x10a0,
+
+  // JP Z,DEADh
+  0x10a1,
+  0x10a2,
+  0x10a3,
+
+  // JR 2 <10A6h>
+  0x10a4,
+  0x10a5,
+
+  // JR 0 <10A6h>
+  0x10a6,
+  0x10a7,
+
+  // JR -2 <10A6h>
+  0x10a8,
+  0x10a9,
+
+  // JP (HL)
+  0x10aa,
+
+  // JP (IX)
+  0x10ab,
+  0x10ac,
+
+  // RETI
+  0x10ad,
+  0x10ae,
+
+  // RST 18h
+  0x10af,
+
+  // IN A,(10h)
+  0x10b0,
+  0x10b1,
+
+  // IN C,(C)
+  0x10b2,
+  0x10b3,
+
+  // OUT (C),H
+  0x10b4,
+  0x10b5,
 };
 
 #define FN  (CC_Z80_IORQ | CC_Z80_WR | CC_Z80_RESET | CC_Z80_INT)
@@ -2884,6 +3117,99 @@ const uint32_t debug_control[] = {
   FN, N,
 
   // CPDR
+  FN, N,
+
+  // ADD B
+  FN,
+
+  // ADD 10h
+  FN, N,
+
+  // ADD (HL)
+  FN,
+
+  // ADD (IX+100)
+  FN, N, N,
+
+  // ADC C
+  FN,
+
+  // SUB (HL)
+  FN,
+
+  // SBC (IY+8)
+  FN, N, N,
+
+  // ADD HL,SP
+  FN,
+
+  // ADC HL,SP
+  FN, N,
+
+  // SBC HL,SP
+  FN, N,
+
+  // ADD IX,IX
+  FN, N,
+
+  // ADD IY,IY
+  FN, N,
+
+  // INC BC
+  FN,
+
+  // INC IY
+  FN, N,
+
+  // RLCA
+  FN,
+
+  // RLC B
+  FN, N,
+
+  // RLC (IX+10)
+  FN, N, N, N,
+
+  // BIT 1,L
+  FN, N,
+
+  // BIT 6,(IX+0)
+  FN, N, N, N,
+
+  // JP BEEFh
+  FN, N, N,
+
+  // JP Z,DEADh
+  FN, N, N,
+
+  // JR 2 <10A6h>
+  FN, N,
+
+  // JR 0 <10A6h>
+  FN, N,
+
+  // JR -2 <10A6h>
+  FN, N,
+
+  // JP (HL)
+  FN,
+
+  // JP (IX)
+  FN, N,
+
+  // RETI
+  FN, N,
+
+  // RST 18h
+  FN,
+
+  // IN A,(10h)
+  FN, N,
+
+  // IN C,(C)
+  FN, N,
+
+  // OUT (C),H
   FN, N,
 };
 
