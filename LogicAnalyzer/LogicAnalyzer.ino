@@ -852,13 +852,6 @@ insn_decode_format_z80(struct insn_decode *id)
   // order that we humans read them, so no special-casing is
   // necessary.
   //
-  // Similarly, there are indexed addressing modes of some of the CB-group
-  // instructions where the operand actually appears before the final opcode
-  // that specifies the function.  For these instructions, the displacement
-  // byte is simply the first byte after the {DD,FD} and CB bytes; the only
-  // special handling we need to do there is to notice the CB byte and advance
-  // over it.
-  //
   int opr_byte = 1;
   if (id->bytes[0] == 0xcb || id->bytes[0] == 0xed) {
     opr_byte++;
