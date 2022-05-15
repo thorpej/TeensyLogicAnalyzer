@@ -150,7 +150,8 @@ typedef enum {
 uint32_t control[BUFFSIZE];           // Recorded control line data
 uint32_t address[BUFFSIZE];           // Recorded address data
 uint32_t data[BUFFSIZE];              // Recorded data lines
-uint32_t triggerAddress = 0;          // Address or data to trigger on
+uint32_t triggerAddress = 0;          // Address to trigger on
+uint32_t triggerData = 0;             // Data to trigger on
 uint32_t aTriggerBits;                // GPIO bit pattern to trigger address on
 uint32_t aTriggerMask;                // bitmask of GPIO address bits
 uint32_t cTriggerBits;                // GPIO bit pattern to trigger control on
@@ -3503,7 +3504,7 @@ show_trigger(void)
       break;
     case tr_data:
       Serial.print("on data ");
-      Serial.print(triggerAddress, HEX);
+      Serial.print(triggerData, HEX);
       switch (triggerCycle) {
         case tr_read:
           Serial.println(" read");
@@ -4245,7 +4246,7 @@ go(void)
       cTriggerBits = scramble_CCxx(tbits, &aTriggerBits, &dTriggerBits);
     }
   } else if (triggerMode == tr_data) {
-    dTriggerBits = scramble_CDxx(triggerAddress);
+    dTriggerBits = scramble_CDxx(triggerData);
     dTriggerMask = scramble_CDxx(0xff);
 
     // Check for r/w qualifier
@@ -4556,7 +4557,7 @@ loop(void) {
     } else if (cmd.startsWith("t d ")) {
       int n = strtol(cmd.substring(4, 6).c_str(), NULL, 16);
       if ((n >= 0) && (n <= 0xff)) {
-        triggerAddress = n;
+        triggerData = n;
         triggerMode = tr_data;
         if ((cmd.length() == 8) && cmd.endsWith('r')) {
           triggerCycle = tr_read;
