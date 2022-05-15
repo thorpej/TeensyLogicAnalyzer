@@ -35,10 +35,11 @@
 // able to go up to at least 30,000 before running out of memory.
 #define BUFFSIZE 5000
 
-const char *versionString = "TeensyLogicAnalyzer version 0.1 by Jason R. Thorpe <thorpej@me.com>";
+const char *versionString = "Teensy Logic Analyzer version 0.2";
+const char *verboseVersionStringAdditions = " by Jason R. Thorpe <thorpej@me.com>";
 const char *origVersionString = "Based on Logic Analyzer version 0.30 by Jeff Tranter <tranter@pobox.com>";
 
-// Type definitions
+// Trigger and CPU type definitions
 typedef enum { tr_address, tr_io, tr_data, tr_reset, tr_irq, tr_firq, tr_nmi, tr_none } trigger_t;
 typedef enum { tr_read, tr_write, tr_either } cycle_t;
 typedef enum { cpu_none, cpu_6502, cpu_65c02, cpu_6800, cpu_6809, cpu_6809e, cpu_z80 } cpu_t;
@@ -165,6 +166,18 @@ trigger_t triggerMode = tr_none;      // Type of trigger
 cycle_t triggerCycle = tr_either;     // Trigger on read, write, or either
 bool triggerLevel = false;            // Trigger level (false=low, true=high);
 volatile bool triggerPressed = false; // Set by hardware trigger button
+
+void
+show_version(bool verbose)
+{
+  if (verbose) {
+    Serial.print(versionString);
+    Serial.println(verboseVersionStringAdditions);
+    Serial.println(origVersionString);
+  } else {
+    Serial.println(versionString);
+  }
+}
 
 //
 // Helpers to return datums of various types from the data buffer at the
@@ -979,9 +992,7 @@ insn_decode_next_state_z80(struct insn_decode *id)
 //
 // 6809 instruction decoding
 //
-
 #define POSTBYTES(am, n) [(am) - am6809_first] = (n)
-
 const uint8_t
 insn_postbytes_6809[] = {
   POSTBYTES(am6809_inherent,        0),
@@ -1014,7 +1025,6 @@ insn_postbytes_6809[] = {
   POSTBYTES(am6809_exg_tfr,         1),
   POSTBYTES(am6809_psh_pul,         1),
 };
-
 #undef POSTBYTES
 
 const char *opcodes_6809[256] = {
@@ -3216,7 +3226,7 @@ const uint32_t debug_control[] = {
 #define DEBUG_SAMPLES
 #endif
 
-// Macros
+// Macros to await signal transitions.
 #define WAIT_PHI2_LOW while (digitalReadFast(CC_6502_PHI2_PIN) == HIGH) ;
 #define WAIT_PHI2_HIGH while (digitalReadFast(CC_6502_PHI2_PIN) == LOW) ;
 #define WAIT_Q_LOW while (digitalReadFast(CC_6809_Q) == HIGH) ;
@@ -3411,8 +3421,7 @@ setup(void)
   }
 
   Serial.setTimeout(60000);
-  Serial.println(versionString);
-  Serial.println(origVersionString);
+  show_version(false);
   Serial.println("Type h or ? for help.");
 }
 
@@ -3448,13 +3457,6 @@ cpu_name(void)
     default:
       return "not set";
   }
-}
-
-void
-show_version(void)
-{
-  Serial.println(versionString);
-  Serial.println(origVersionString);
 }
 
 void
@@ -3560,7 +3562,7 @@ show_pretrigger(void)
 void
 help(void)
 {
-  show_version();
+  show_version(true);
   show_cpu();
   show_trigger();
   show_samples();
@@ -3583,16 +3585,18 @@ help(void)
     Serial.println("t i <address> [r|w]  - Trigger on i/o address");
   }
   Serial.println("t d <data> [r|w]     - Trigger on data");
-  Serial.println("t reset 0|1          - Trigger on /RESET level");
-  if (cpu == cpu_z80) {
-    Serial.println("t int 0|1            - Trigger on /INT level");
-  } else {
-    Serial.println("t irq 0|1            - Trigger on /IRQ level");
+  if (cpu != cpu_none) {
+    Serial.println("t reset 0|1          - Trigger on /RESET level");
+    if (cpu == cpu_z80) {
+      Serial.println("t int 0|1            - Trigger on /INT level");
+    } else {
+      Serial.println("t irq 0|1            - Trigger on /IRQ level");
+    }
+    if (cpu == cpu_6809 || cpu == cpu_6809e) {
+      Serial.println("t firq 0|1           - Trigger on /FIRQ level");
+    }
+    Serial.println("t nmi 0|1            - Trigger on /NMI level");
   }
-  if (cpu == cpu_6809 || cpu == cpu_6809e) {
-    Serial.println("t firq 0|1           - Trigger on /FIRQ level");
-  }
-  Serial.println("t nmi 0|1            - Trigger on /NMI level");
   Serial.println("t none               - Trigger freerun");
   Serial.println("t                    - Show current trigger");
   Serial.println("g                    - Go/start analyzer");
@@ -3604,6 +3608,10 @@ help(void)
   Serial.println("D                    - Load debug sample data");
 #endif
   Serial.println("h or ?               - Show command usage");
+  if (cpu == cpu_none) {
+    Serial.println("");
+    Serial.println("Select a CPU type to see additional trigger options.");
+  }
 }
 
 void
