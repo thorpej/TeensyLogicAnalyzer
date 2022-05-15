@@ -4250,6 +4250,8 @@ go(void)
     } else {
       uint32_t tmask, tbits;
 
+      // XXX Do we want to qualify "memory data" vs "I/O data"?
+
       tmask = CC_Z80_MREQ | CC_Z80_IORQ;
       tbits = CC_Z80_IORQ;                // Memory cycle
       if (triggerCycle == tr_read) {
@@ -4263,9 +4265,27 @@ go(void)
       cTriggerBits = scramble_CCxx(tbits, &aTriggerBits, &dTriggerBits);
     }
 
-    // TODO: Add support for Z80 I/O read or write trigger.
+  } else if (triggerMode == tr_io) {
+    aTriggerBits = scramble_CAxx(triggerAddress);
+    aTriggerMask = scramble_CAxx(0xff);
 
-    // TODO: Add support for Z80 I/O control line triggers.
+    if (cpu == cpu_z80) {
+      uint32_t tmask, tbits;
+
+      tmask = CC_Z80_MREQ | CC_Z80_IORQ;
+      tbits = CC_Z80_MREQ;                // I/O cycle
+      if (triggerCycle == tr_read) {
+        tmask |= CC_Z80_RD | CC_Z80_WR;
+        tbits |= CC_Z80_WR;               // Read cycle
+      } else if (triggerCycle == tr_write) {
+        tmask |= CC_Z80_RD | CC_Z80_WR;
+        tbits |= CC_Z80_RD;               // Write cycle
+      }
+      cTriggerMask = scramble_CCxx(tmask, &aTriggerMask, &dTriggerMask);
+      cTriggerBits = scramble_CCxx(tbits, &aTriggerBits, &dTriggerBits);
+    }
+
+  // TODO: Add support other Z80 control line triggers.
 
   } else if (triggerMode == tr_reset) {
     if (cpu != cpu_z80) {
