@@ -2236,7 +2236,7 @@ const uint32_t debug_control[] = {
 #ifdef DEBUG_6800
 #endif // DEBUG_6800
 
-#define DEBUG_Z80
+// #define DEBUG_Z80
 #ifdef DEBUG_Z80
 #define DEBUG_CPU             cpu_z80
 
