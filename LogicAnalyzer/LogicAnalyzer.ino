@@ -40,9 +40,12 @@ const char *verboseVersionStringAdditions = " by Jason R. Thorpe <thorpej@me.com
 const char *origVersionString = "Based on Logic Analyzer version 0.30 by Jeff Tranter <tranter@pobox.com>";
 
 // Trigger and CPU type definitions
-typedef enum { tr_address, tr_io, tr_data, tr_addr_data, tr_reset, tr_irq, tr_firq, tr_nmi, tr_none } trigger_t;
+typedef enum { tr_address, tr_data, tr_addr_data, tr_reset, tr_irq, tr_firq, tr_nmi, tr_none } trigger_t;
+typedef enum { tr_mem, tr_io } space_t;
 typedef enum { tr_read, tr_write, tr_either } cycle_t;
 typedef enum { cpu_none, cpu_6502, cpu_65c02, cpu_6800, cpu_6809, cpu_6809e, cpu_z80 } cpu_t;
+
+#define cpu_has_iospace(c)  ((c) == cpu_z80)
 
 // addressing mode types
 typedef enum {
@@ -165,6 +168,7 @@ int samplesTaken = 0;                 // Number of samples taken
 cpu_t cpu = cpu_none;                 // Current CPU type
 trigger_t triggerMode = tr_none;      // Type of trigger
 cycle_t triggerCycle = tr_either;     // Trigger on read, write, or either
+space_t triggerSpace = tr_mem;        // default to memory space
 bool triggerLevel = false;            // Trigger level (false=low, true=high);
 volatile bool triggerPressed = false; // Set by hardware trigger button
 
@@ -3468,27 +3472,26 @@ show_cpu(void)
 }
 
 void
+set_cpu(cpu_t ncpu)
+{
+  if (triggerSpace == tr_io && !cpu_has_iospace(ncpu)) {
+    triggerSpace = tr_mem;
+    triggerMode = tr_none;
+  }
+  cpu = ncpu;
+}
+
+void
 show_trigger(void)
 {
   Serial.print("Trigger: ");
   switch (triggerMode) {
     case tr_address:
-      Serial.print("on address ");
-      Serial.print(triggerAddress, HEX);
-      switch (triggerCycle) {
-        case tr_read:
-          Serial.println(" read");
-          break;
-        case tr_write:
-          Serial.println(" write");
-          break;
-        case tr_either:
-          Serial.println(" read or write");
-          break;
+      if (triggerSpace == tr_io) {
+        Serial.print("on io ");
+      } else {
+        Serial.print("on address ");
       }
-      break;
-    case tr_io:
-      Serial.print("on io ");
       Serial.print(triggerAddress, HEX);
       switch (triggerCycle) {
         case tr_read:
@@ -3518,7 +3521,11 @@ show_trigger(void)
       }
       break;
     case tr_addr_data:
-      Serial.print("on address ");
+      if (triggerSpace == tr_io) {
+        Serial.print("on io ");
+      } else {
+        Serial.print("on address ");
+      }
       Serial.print(triggerAddress, HEX);
       Serial.print(" and data ");
       Serial.print(triggerData, HEX);
@@ -3599,7 +3606,7 @@ help(void)
   Serial.println("p <samples>                 - Set pre-trigger samples");
   Serial.println("p                           - Show current pre-trigger samples");
   Serial.println("t a <address> [r|w]         - Trigger on address");
-  if (cpu == cpu_z80) {
+  if (cpu_has_iospace(cpu)) {
     Serial.println("t i <address> [r|w]         - Trigger on i/o address");
   }
   Serial.println("t d <data> [r|w]            - Trigger on data");
@@ -4238,21 +4245,19 @@ go(void)
 
   // Scramble the trigger address, control, and data lines to match what we will read on the ports.
 
-  if (triggerMode == tr_address || triggerMode == tr_data ||
-      triggerMode == tr_addr_data ||
-      triggerMode == tr_io) {
+  if (triggerMode == tr_address || triggerMode == tr_data || triggerMode == tr_addr_data) {
 
     if (triggerMode == tr_address || triggerMode == tr_addr_data) {
       aTriggerBits = scramble_CAxx(triggerAddress);
-      aTriggerMask = scramble_CAxx(0xffff);
+      if (triggerSpace == tr_io) {
+        aTriggerMask = scramble_CAxx(0xff);
+      } else {
+        aTriggerMask = scramble_CAxx(0xffff);
+      }
     }
     if (triggerMode == tr_data || triggerMode == tr_addr_data) {
       dTriggerBits = scramble_CDxx(triggerData);
       dTriggerMask = scramble_CDxx(0xff);
-    }
-    if (triggerMode == tr_io) {
-      aTriggerBits = scramble_CAxx(triggerAddress);
-      aTriggerMask = scramble_CAxx(0xff);
     }
 
     // Check for r/w qualifer
@@ -4266,7 +4271,7 @@ go(void)
       uint32_t tmask, tbits;
 
       tmask = CC_Z80_MREQ | CC_Z80_IORQ;
-      if (triggerMode == tr_io) {
+      if (triggerSpace == tr_io) {
         tbits = CC_Z80_MREQ;              // I/O cycle
       } else {
         tbits = CC_Z80_IORQ;              // Memory cycle
@@ -4447,17 +4452,17 @@ loop(void) {
     } else if (cmd == "c") {
       show_cpu();
     } else if (cmd == "c 6502") {
-      cpu = cpu_6502;
+      set_cpu(cpu_6502);
     } else if ((cmd == "c 65c02") || (cmd == "c 65C02")) {
-      cpu = cpu_65c02;
+      set_cpu(cpu_65c02);
     } else if (cmd == "c 6800") {
-      cpu = cpu_6800;
+      set_cpu(cpu_6800);
     } else if (cmd == "c 6809") {
-      cpu = cpu_6809;
+      set_cpu(cpu_6809);
     } else if ((cmd == "c 6809e") || (cmd == "c 6809E")) {
-      cpu = cpu_6809e;
+      set_cpu(cpu_6809e);
     } else if ((cmd == "c z80") || (cmd == "c Z80")) {
-      cpu = cpu_z80;
+      set_cpu(cpu_z80);
 
       // Samples
     } else if (cmd == "s") {
@@ -4532,6 +4537,7 @@ loop(void) {
       if ((n >= 0) && (n <= 0xffff)) {
         triggerAddress = n;
         triggerMode = tr_address;
+        triggerSpace = tr_mem;
         if ((cmd.length() == 10) && cmd.endsWith('r')) {
           triggerCycle = tr_read;
         } else if ((cmd.length() == 10) && cmd.endsWith('w')) {
@@ -4547,6 +4553,7 @@ loop(void) {
       if ((n >= 0) && (n <= 0xff)) {
         triggerData = n;
         triggerMode = tr_data;
+        triggerSpace = tr_mem;
         if ((cmd.length() == 8) && cmd.endsWith('r')) {
           triggerCycle = tr_read;
         } else if ((cmd.length() == 8) && cmd.endsWith('w')) {
@@ -4565,6 +4572,7 @@ loop(void) {
         if ((n >= 0) && (n <= 0xff)) {
           triggerData = n;
           triggerMode = tr_addr_data;
+          triggerSpace = tr_mem;
           if ((cmd.length() == 14) && cmd.endsWith('r')) {
             triggerCycle = tr_read;
           } else if ((cmd.length() == 14) && cmd.endsWith('w')) {
@@ -4578,11 +4586,12 @@ loop(void) {
       } else {
         Serial.println("Invalid address, must be between 0 and FFFF.");
       }
-    } else if (cmd.startsWith("t i ")) {
+    } else if (cmd.startsWith("t i ") && cpu_has_iospace(cpu)) {
       int n = strtol(cmd.substring(4, 6).c_str(), NULL, 16);
       if ((n >= 0) && (n <= 0xff)) {
         triggerAddress = n;
-        triggerMode = tr_io;
+        triggerMode = tr_address;
+        triggerSpace = tr_io;
         if ((cmd.length() == 8) && cmd.endsWith('r')) {
           triggerCycle = tr_read;
         } else if ((cmd.length() == 8) && cmd.endsWith('w')) {
