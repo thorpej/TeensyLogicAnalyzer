@@ -3793,7 +3793,7 @@ list(Stream &stream, int start, int end, int validSamples)
   int first = (triggerPoint - pretrigger + samples) % samples;
   int last = (triggerPoint - pretrigger + samples - 1) % samples;
 
-  bool seen_lic = false;
+  bool have_lic, seen_lic = false;
 
   const char *cycle, *trig;
   const char *comma;
@@ -3827,6 +3827,11 @@ list(Stream &stream, int start, int end, int validSamples)
       }
 
       if (cpu == cpu_6809 || cpu == cpu_6809e) {
+        // Get the current status of LIC.  Note that LIC will also
+        // be high while the processor is in SYNC state or while
+        // stacking registers during an interrupt.
+        have_lic = (cpu == cpu_6809e && (control[i] & CC_6809E_LIC));
+
         // 6809 doens't have a VMA signal like the 6800, but the
         // data sheet describes how to detect a so-called "dummy
         // cycle" (which is also calls "/VMA").
@@ -3839,7 +3844,9 @@ list(Stream &stream, int start, int end, int validSamples)
           // if it looks like we're doing a vector fetch, though.
           cycle = "R";
           if (cpu == cpu_6809e && address[i] < 0xfff0) {
-            if (seen_lic) {
+            // Even if we have seen LIC go by, it's not an
+            // instruction fetch until LIC goes low.
+            if (seen_lic && !have_lic) {
               cycle = "F";
               insn_decode_begin(&id, address[i], data[i]);
               seen_lic = false;
@@ -3852,7 +3859,7 @@ list(Stream &stream, int start, int end, int validSamples)
         } else {
           cycle = "W";
         }
-        if (cpu == cpu_6809e && (control[i] & CC_6809E_LIC)) {
+        if (have_lic) {
           seen_lic = true;
         }
       }
