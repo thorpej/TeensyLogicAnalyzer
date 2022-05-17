@@ -181,6 +181,12 @@ read_s16be(const uint8_t *buf, int i)
 extern "C" {
 #endif
 
+void insn_decode_init(struct insn_decode *);
+bool insn_decode_next_state(struct insn_decode *);
+void insn_decode_begin(struct insn_decode *, uint32_t, uint8_t);
+bool insn_decode_continue(struct insn_decode *, uint8_t);
+const char *insn_decode_complete(struct insn_decode *);
+
 void insn_decode_next_state_6502(struct insn_decode *);
 void insn_decode_next_state_6800(struct insn_decode *);
 void insn_decode_next_state_6809(struct insn_decode *);
