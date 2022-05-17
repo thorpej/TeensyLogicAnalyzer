@@ -22,6 +22,9 @@
 
 */
 
+#ifndef insn_decode_h_included
+#define insn_decode_h_included
+
 // addressing mode types
 typedef enum {
   // Unrecognized opcodes get this
@@ -174,7 +177,17 @@ read_s16be(const uint8_t *buf, int i)
   return (int16_t)read_u16be(buf, i);
 }
 
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
 void insn_decode_next_state_6502(struct insn_decode *);
 void insn_decode_next_state_6800(struct insn_decode *);
 void insn_decode_next_state_6809(struct insn_decode *);
 void insn_decode_next_state_z80(struct insn_decode *);
+
+#if defined(__cplusplus)
+}
+#endif
+
+#endif /* insn_decode_h_included */
