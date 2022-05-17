@@ -693,6 +693,9 @@ help(void)
   }
   Serial.println("t d <data> [r|w]            - Trigger on data");
   Serial.println("t ad <address> <data> [r|w] - Trigger on address and data");
+  if (cpu_has_iospace(cpu)) {
+    Serial.println("t id <address> <data> [r|w] - Trigger on i/o address and data");
+  }
   if (cpu != cpu_none) {
     Serial.println("t reset 0|1                 - Trigger on /RESET level");
     if (cpu == cpu_z80) {
@@ -1589,6 +1592,10 @@ loop(void) {
 
     } else if (cmd.startsWith("t i ") && cpu_has_iospace(cpu)) {
       parseAddressOrDataTrigger(cmd, 4, 6, 8, 0, 0xff, tr_address, tr_io);
+
+    } else if (cmd.startsWith("t id ")  && cpu_has_iospace(cpu)) {
+      parseAddressAndDataTrigger(cmd, 5, 9, 10, 12, 14,
+          0, 0xff, 0, 0xff, tr_addr_data, tr_io);
 
       // Decode instruction
     } else if (cmd.startsWith("d ")) {
