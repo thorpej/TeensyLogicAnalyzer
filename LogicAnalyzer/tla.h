@@ -46,6 +46,8 @@ extern "C" {
 
 extern cpu_t cpu;
 
+int tla_printf(const char *, ...);
+
 #if defined(__cplusplus)
 }
 #endif

@@ -66,15 +66,33 @@ extern "C" {
   cpu_t cpu = cpu_none;                 // Current CPU type
 }
 
+extern "C" {
+  __attribute__((__format__(__printf__, 1, 2)))
+  int
+  tla_printf(const char *fmt, ...)
+  {
+    va_list ap;
+    char msg[80];
+    int rv;
+
+    va_start(ap, fmt);
+    rv = vsprintf(msg, fmt, ap);
+    va_end(ap);
+
+    Serial.println(msg);
+
+    return rv;
+  }
+}
+
 void
 show_version(bool verbose)
 {
   if (verbose) {
-    Serial.print(versionString);
-    Serial.println(verboseVersionStringAdditions);
-    Serial.println(origVersionString);
+    tla_printf("%s%s", versionString, verboseVersionStringAdditions);
+    tla_printf("%s", origVersionString);
   } else {
-    Serial.println(versionString);
+    tla_printf(versionString);
   }
 }
 
@@ -494,7 +512,7 @@ setup(void)
 
   Serial.setTimeout(60000);
   show_version(false);
-  Serial.println("Type h or ? for help.");
+  tla_printf("Type h or ? for help.");
 }
 
 // Interrupt handler for trigger button.
@@ -534,8 +552,7 @@ cpu_name(void)
 void
 show_cpu(void)
 {
-  Serial.print("CPU: ");
-  Serial.println(cpu_name());
+  tla_printf("CPU: %s", cpu_name());
 }
 
 void
@@ -639,15 +656,13 @@ show_trigger(void)
 void
 show_samples(void)
 {
-  Serial.print("Sample buffer size: ");
-  Serial.println(samples);
+  tla_printf("Sample buffer size: %d", samples);
 }
 
 void
 show_pretrigger(void)
 {
-  Serial.print("Pretrigger samples: ");
-  Serial.println(pretrigger);
+  tla_printf("Pretrigger samples: %d", pretrigger);
 }
 
 // Display settings and help info.
@@ -724,11 +739,9 @@ disassemble_one(uint32_t where)
     }
   }
   if (address[i] != where) {
-    Serial.println("Address not found in sample data.");
+    tla_printf("Address not found in sample data.");
     return;
   }
-
-  char output[50];
 
   for (;; i = (i + 1) % samples) {
     switch (id.state) {
@@ -738,16 +751,15 @@ disassemble_one(uint32_t where)
 
       case ds_fetching:
         if (address[i] != where + id.bytes_fetched) {
-          Serial.println("!!!! Non-contiguous instruction fetch?");
+          tla_printf("!!!! Non-contiguous instruction fetch?");
         }
         // FALLTHROUGH
 
       default:
         insn_decode_continue(&id, data[i]);
       printit:
-        sprintf(output, "%04lX  %02lX  %s",
+        tla_printf("%04lX  %02lX  %s",
             address[i], data[i], insn_decode_complete(&id));
-        Serial.println(output);
         break;
     }
     if (id.state == ds_complete || i == last) {
@@ -1166,12 +1178,12 @@ writeSD(void)
   const char *TXT_FILE = "analyzer.txt";
 
   if (cpu == cpu_none || samplesTaken == 0) {
-    Serial.println("No samples to save.");
+    tla_printf("No samples to save.");
     return;
   }
 
   if (!SD.begin(BUILTIN_SDCARD)) {
-    Serial.println("Unable to initialize internal SD card.");
+    tla_printf("Unable to initialize internal SD card.");
     return;
   }
 
@@ -1182,13 +1194,11 @@ writeSD(void)
 
   File file = SD.open(CSV_FILE, FILE_WRITE);
   if (file) {
-    Serial.print("Writing ");
-    Serial.println(CSV_FILE);
+    tla_printf("Writing %s", CSV_FILE);
     exportCSV(file, samplesTaken);
     file.close();
   } else {
-    Serial.print("Unable to write ");
-    Serial.println(CSV_FILE);
+    tla_printf("Unable to write %s", CSV_FILE);
   }
 
   // Remove any existing file
@@ -1198,13 +1208,11 @@ writeSD(void)
 
   file = SD.open(TXT_FILE, FILE_WRITE);
   if (file) {
-    Serial.print("Writing ");
-    Serial.println(TXT_FILE);
+    tla_printf("Writing %s", TXT_FILE);
     list(file, 0, samples - 1, samplesTaken);
     file.close();
   } else {
-    Serial.print("Unable to write ");
-    Serial.println(TXT_FILE);
+    tla_printf("Unable to write %s", TXT_FILE);
   }
 }
 
@@ -1224,7 +1232,7 @@ go(void)
   uint32_t cd_psr_cc_bits;
 
   if (cpu == cpu_none) {
-    Serial.println("No CPU type selected!");
+    tla_printf("No CPU type selected!");
   }
 
   // Scramble the trigger address, control, and data lines to match what we will read on the ports.
@@ -1307,7 +1315,7 @@ go(void)
     }
   }
 
-  Serial.println("Waiting for trigger...");
+  tla_printf("Waiting for trigger...");
 
   triggerPressed = false; // Status of trigger button
 
@@ -1391,9 +1399,7 @@ go(void)
 
   setBusEnabled(false);
 
-  Serial.print("Data recorded (");
-  Serial.print(samples);
-  Serial.println(" samples).");
+  tla_printf("Data recorded (%d samples).", samples);
   unscramble();
 }
 
@@ -1414,11 +1420,9 @@ parseAddressOrDataTrigger(String &cmd, unsigned int valstart, unsigned int valen
       triggerCycle = tr_either;
     }
   } else {
-    char msg[50];
-    sprintf(msg, "Invalid %s, must be between %lX and %lX.",
+    tla_printf("Invalid %s, must be between %lX and %lX.",
         type == tr_address ? "address" : "data value",
         valmin, valmax);
-    Serial.println(msg);
   }
 }
 
@@ -1431,7 +1435,6 @@ parseAddressAndDataTrigger(String &cmd, unsigned int astart, unsigned int aend,
                            trigger_t type, space_t space)
 {
   uint32_t new_triggerAddress;
-  char msg[50];
 
   uint32_t n = strtol(cmd.substring(astart, aend).c_str(), NULL, 16);
   if ((n >= amin) && (n <= amax)) {
@@ -1450,14 +1453,12 @@ parseAddressAndDataTrigger(String &cmd, unsigned int astart, unsigned int aend,
         triggerCycle = tr_either;
       }
     } else {
-      sprintf(msg, "Invalid data value, must be between %lX and %lX.",
+      tla_printf("Invalid data value, must be between %lX and %lX.",
           dmin, dmax);
-      Serial.println(msg);
     }
   } else {
-    sprintf(msg, "Invalid address, must be between %lX and %lX.",
+    tla_printf("Invalid address, must be between %lX and %lX.",
         amin, amax);
-    Serial.println(msg);
   }
 }
 
@@ -1525,9 +1526,7 @@ loop(void) {
         memset(address, 0, sizeof(address));
         memset(data, 0, sizeof(data));
       } else {
-        Serial.print("Invalid samples, must be between 1 and ");
-        Serial.print(BUFFSIZE);
-        Serial.println(".");
+        tla_printf("Invalid samples, must be between 1 and %d.", BUFFSIZE);
       }
 
       // Pretrigger
@@ -1540,9 +1539,7 @@ loop(void) {
       if ((n >= 0) && (n <= samples)) {
         pretrigger = n;
       } else {
-        Serial.print("Invalid samples, must be between 0 and ");
-        Serial.print(samples);
-        Serial.println(".");
+        tla_printf("Invalid samples, must be between 0 and %d.", samples);
       }
 
       // Trigger
@@ -1599,7 +1596,7 @@ loop(void) {
       if (n >= 0 && n <= 0xffff) {
         disassemble_one(n);
       } else {
-        Serial.println("Invalid address, must be between 0 and FFFF.");
+        tla_printf("Invalid address, must be between 0 and FFFF.");
       }
 
       // Go
@@ -1615,9 +1612,7 @@ loop(void) {
         // l <start>
         int start = cmd.substring(2).toInt();
         if ((start < 0) || (start >= samples)) {
-          Serial.print("Invalid start, must be between 0 and ");
-          Serial.print(samples - 1);
-          Serial.println(".");
+          tla_printf("Invalid start, must be between 0 and %d.", samples - 1);
         } else {
           list(Serial, start, samples - 1, samplesTaken);
         }
@@ -1627,15 +1622,9 @@ loop(void) {
         int start = cmd.substring(2).toInt();
         int end = cmd.substring(cmd.lastIndexOf(" ")).toInt();
         if ((start < 0) || (start >= samples)) {
-          Serial.print("Invalid start, must be between 0 and ");
-          Serial.print(samples - 1);
-          Serial.println(".");
+          tla_printf("Invalid start, must be between 0 and %d.", samples - 1);
         } else if ((end < start) || (end >= samples)) {
-          Serial.print("Invalid end, must be between ");
-          Serial.print(start);
-          Serial.print(" and ");
-          Serial.print(samples - 1);
-          Serial.println(".");
+          tla_printf("Invalid end, must be between %d and %d.", start, samples - 1);
         } else {
           list(Serial, start, end, samplesTaken);
         }
@@ -1665,9 +1654,7 @@ loop(void) {
     } else {
       // Invalid command
       if (cmd != "") {
-        Serial.print("Invalid command: '");
-        Serial.print(cmd);
-        Serial.println("'!");
+        tla_printf("Invalid command: '%s'", cmd.c_str());
       }
     }
   }
