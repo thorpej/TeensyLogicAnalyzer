@@ -707,7 +707,6 @@ help(void)
   }
 }
 
-// Disassemble a single instrution at the specified address.
 void
 disassemble_one(uint32_t where)
 {
@@ -1399,6 +1398,70 @@ go(void)
 }
 
 void
+parseAddressOrDataTrigger(String &cmd, unsigned int valstart, unsigned int valend, unsigned int cmdlen,
+                          uint32_t valmin, uint32_t valmax, trigger_t type, space_t space)
+{
+  uint32_t n = strtol(cmd.substring(valstart, valend).c_str(), NULL, 16);
+  if ((n >= valmin) && (n <= valmax)) {
+    triggerAddress = n;
+    triggerMode = type;
+    triggerSpace = space;
+    if ((cmd.length() == cmdlen) && cmd.endsWith('r')) {
+      triggerCycle = tr_read;
+    } else if ((cmd.length() == cmdlen) && cmd.endsWith('w')) {
+      triggerCycle = tr_write;
+    } else {
+      triggerCycle = tr_either;
+    }
+  } else {
+    char msg[50];
+    sprintf(msg, "Invalid %s, must be between %lX and %lX.",
+        type == tr_address ? "address" : "data value",
+        valmin, valmax);
+    Serial.println(msg);
+  }
+}
+
+void
+parseAddressAndDataTrigger(String &cmd, unsigned int astart, unsigned int aend,
+                           unsigned int dstart, unsigned int dend,
+                           unsigned int cmdlen,
+                           uint32_t amin, uint32_t amax,
+                           uint32_t dmin, uint32_t dmax,
+                           trigger_t type, space_t space)
+{
+  uint32_t new_triggerAddress;
+  char msg[50];
+
+  uint32_t n = strtol(cmd.substring(astart, aend).c_str(), NULL, 16);
+  if ((n >= amin) && (n <= amax)) {
+    new_triggerAddress = n;
+    n = strtol(cmd.substring(dstart, dend).c_str(), NULL, 16);
+    if ((n >= dmin) && (n <= dmax)) {
+      triggerAddress = new_triggerAddress;
+      triggerData = n;
+      triggerMode = tr_addr_data;
+      triggerSpace = tr_mem;
+      if ((cmd.length() == 14) && cmd.endsWith('r')) {
+        triggerCycle = tr_read;
+      } else if ((cmd.length() == 14) && cmd.endsWith('w')) {
+        triggerCycle = tr_write;
+      } else {
+        triggerCycle = tr_either;
+      }
+    } else {
+      sprintf(msg, "Invalid data value, must be between %lX and %lX.",
+          dmin, dmax);
+      Serial.println(msg);
+    }
+  } else {
+    sprintf(msg, "Invalid address, must be between %lX and %lX.",
+        amin, amax);
+    Serial.println(msg);
+  }
+}
+
+void
 loop(void) {
   String cmd;
 
@@ -1518,79 +1581,21 @@ loop(void) {
       triggerMode = tr_nmi;
       triggerLevel = true;
     } else if (cmd.startsWith("t a ")) {
-      int n = strtol(cmd.substring(4, 8).c_str(), NULL, 16);
-      if ((n >= 0) && (n <= 0xffff)) {
-        triggerAddress = n;
-        triggerMode = tr_address;
-        triggerSpace = tr_mem;
-        if ((cmd.length() == 10) && cmd.endsWith('r')) {
-          triggerCycle = tr_read;
-        } else if ((cmd.length() == 10) && cmd.endsWith('w')) {
-          triggerCycle = tr_write;
-        } else {
-          triggerCycle = tr_either;
-        }
-      } else {
-        Serial.println("Invalid address, must be between 0 and FFFF.");
-      }
+      parseAddressOrDataTrigger(cmd, 4, 8, 10, 0, 0xffff, tr_address, tr_mem);
+
     } else if (cmd.startsWith("t d ")) {
-      int n = strtol(cmd.substring(4, 6).c_str(), NULL, 16);
-      if ((n >= 0) && (n <= 0xff)) {
-        triggerData = n;
-        triggerMode = tr_data;
-        triggerSpace = tr_mem;
-        if ((cmd.length() == 8) && cmd.endsWith('r')) {
-          triggerCycle = tr_read;
-        } else if ((cmd.length() == 8) && cmd.endsWith('w')) {
-          triggerCycle = tr_write;
-        } else {
-          triggerCycle = tr_either;
-        }
-      } else {
-        Serial.println("Invalid data, must be between 0 and FF.");
-      }
+      parseAddressOrDataTrigger(cmd, 4, 6, 8, 0, 0xff, tr_data, tr_mem);
+
     } else if (cmd.startsWith("t ad ")) {
-      int n = strtol(cmd.substring(5, 9).c_str(), NULL, 16);
-      if ((n >= 0) && (n <= 0xffff)) {
-        triggerAddress = n;
-        n = strtol(cmd.substring(10, 12).c_str(), NULL, 16);
-        if ((n >= 0) && (n <= 0xff)) {
-          triggerData = n;
-          triggerMode = tr_addr_data;
-          triggerSpace = tr_mem;
-          if ((cmd.length() == 14) && cmd.endsWith('r')) {
-            triggerCycle = tr_read;
-          } else if ((cmd.length() == 14) && cmd.endsWith('w')) {
-            triggerCycle = tr_write;
-          } else {
-            triggerCycle = tr_either;
-          }
-        } else {
-          Serial.println("Invalid data, must be between 0 and FF.");
-        }
-      } else {
-        Serial.println("Invalid address, must be between 0 and FFFF.");
-      }
+      parseAddressAndDataTrigger(cmd, 5, 9, 10, 12, 14,
+          0, 0xffff, 0, 0xff, tr_addr_data, tr_mem);
+
     } else if (cmd.startsWith("t i ") && cpu_has_iospace(cpu)) {
-      int n = strtol(cmd.substring(4, 6).c_str(), NULL, 16);
-      if ((n >= 0) && (n <= 0xff)) {
-        triggerAddress = n;
-        triggerMode = tr_address;
-        triggerSpace = tr_io;
-        if ((cmd.length() == 8) && cmd.endsWith('r')) {
-          triggerCycle = tr_read;
-        } else if ((cmd.length() == 8) && cmd.endsWith('w')) {
-          triggerCycle = tr_write;
-        } else {
-          triggerCycle = tr_either;
-        }
-      } else {
-        Serial.println("Invalid address, must be between 0 and FF.");
-      }
+      parseAddressOrDataTrigger(cmd, 4, 6, 8, 0, 0xff, tr_address, tr_io);
 
       // Decode instruction
     } else if (cmd.startsWith("d ")) {
-      int n = strtol(cmd.substring(2, 6).c_str(), NULL, 16);
+      uint32_t n = strtol(cmd.substring(2, 6).c_str(), NULL, 16);
       if (n >= 0 && n <= 0xffff) {
         disassemble_one(n);
       } else {
@@ -1604,6 +1609,7 @@ loop(void) {
       // List
     } else if (cmd == "l") {
       list(Serial, 0, samples - 1, samplesTaken);
+ 
     } else if (cmd.startsWith("l ")) {
       if (cmd.indexOf(" ") == cmd.lastIndexOf(" ")) {
         // l <start>
