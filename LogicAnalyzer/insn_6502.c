@@ -46,7 +46,7 @@
 //        decimal representation.  This will also cause us to calculate
 //        the resolved address.
 //
-const char *opcodes_65c02[256] = {
+static const char *opcodes_65c02[256] = {
   "BRK",       "ORA ($nn,X)", "?",         "?",   "TSB $nn",     "ORA $nn",     "ASL $nn",     "RMB0 $nn",
   "PHP",       "ORA #$nn",    "ASLA",      "?",   "TSB $nnnn",   "ORA $nnnn",   "ASL $nnnn",   "BBR0 $nn",
   "BPL rrrr",  "ORA ($nn),Y", "ORA ($nn)", "?",   "TRB $nn",     "ORA $nn,X",   "ASL $nn,X",   "RMB1 $nn",
@@ -81,7 +81,7 @@ const char *opcodes_65c02[256] = {
   "SED",       "SBC $nnnn,Y", "PLX",       "?",   "?",           "SBC $nnnn,X", "INC $nnnn,X", "BBS7 $nn"
 };
 
-const char *opcodes_6502[256] = {
+static const char *opcodes_6502[256] = {
   "BRK",       "ORA ($nn,X)", "?",        "?", "?",           "ORA $nn",     "ASL $nn",     "?",
   "PHP",       "ORA #$nn",    "ASLA",     "?", "?",           "ORA $nnnn",   "ASL $nnnn",   "?",
   "BPL rrrr",  "ORA ($nn),Y", "?",        "?", "?",           "ORA $nn,X",   "ASL $nn,X",   "?",
@@ -116,7 +116,7 @@ const char *opcodes_6502[256] = {
   "SED",       "SBC $nnnn,Y", "?",        "?", "?",           "SBC $nnnn,X", "INC $nnnn,X", "?"
 };
 
-void
+static void
 insn_decode_format_6502(struct insn_decode *id)
 {
   const char **opcodes = (cpu == cpu_65c02) ? opcodes_65c02 : opcodes_6502;

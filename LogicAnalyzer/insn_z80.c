@@ -28,7 +28,7 @@
 //
 // Z80 instruction decoding
 //
-const char *opcodes_z80[256] = {
+static const char *opcodes_z80[256] = {
   "NOP",          "LD BC,XXXXh",  "LD (BC),A",    "INC BC",       "INC B",        "DEC B",        "LD B,XXh",     "RLCA",
   "EX AF,AF'",    "ADD HL,BC",    "LD A,(BC)",    "DEC BC",       "INC C",        "DEC C",        "LD C,XXh",     "RRCA",
   "DJNZ rrrr",    "LD DE,XXXXh",  "LD (DE),A",    "INC DE",       "INC D",        "DEC D",        "LD D,XXh",     "RLA",
@@ -63,7 +63,7 @@ const char *opcodes_z80[256] = {
   "RET M",        "LD SP,HL",     "JP M,XXXXh",   "EI",           "CALL M,XXXXh", "extFD",        "CP XXh",       "RST 38h",
 };
 
-const struct {
+static const struct {
   const char *opr_string;
   addrmode_t opr_mode;
 } z80_operand_types[] = {
@@ -74,7 +74,7 @@ const struct {
     { NULL,       am_invalid,    }, // not really invalid, just "none" or "no more"
 };
 
-int
+static int
 z80_operand_size(addrmode_t mode)
 {
   switch (mode) {
@@ -91,7 +91,7 @@ z80_operand_size(addrmode_t mode)
   }
 }
 
-char *
+static char *
 z80_next_operand(addrmode_t *modep, char **cursor)
 {
   char *cp;
@@ -118,7 +118,7 @@ z80_next_operand(addrmode_t *modep, char **cursor)
 // Substitute a reference to HL in the instruction template
 // with a reference to IX or IY as indicated by first opcode
 // byte.
-bool
+static bool
 z80_hl_to_index(struct insn_decode *id, const char *tmpl, uint8_t opc, uint8_t which)
 {
   const char *t1 = tmpl;
@@ -169,7 +169,7 @@ z80_hl_to_index(struct insn_decode *id, const char *tmpl, uint8_t opc, uint8_t w
   return true;
 }
 
-bool
+static bool
 z80_insn_template(struct insn_decode *id)
 {                                                       // 6 is special; see CB group
   static const char *ld_regs[8] = { "B", "C", "D", "E", "H", "L", "(HL)", "A" };
@@ -302,7 +302,7 @@ z80_insn_template(struct insn_decode *id)
   return true;
 }
 
-void
+static void
 insn_decode_format_z80(struct insn_decode *id)
 {
   //

@@ -53,7 +53,7 @@ insn_decode_init(struct insn_decode *id)
   }
 }
 
-bool
+static bool
 insn_decode_next_state(struct insn_decode *id)
 {
   decode_state_t ostate = id->state;

@@ -30,7 +30,7 @@
 //
 #define POSTBYTES(am, n) [(am) - am6809_first] = (n)
 const uint8_t
-insn_postbytes_6809[] = {
+static insn_postbytes_6809[] = {
   POSTBYTES(am6809_inherent,        0),
   POSTBYTES(am6809_direct,          1),
   POSTBYTES(am6809_extended,        2),
@@ -63,7 +63,7 @@ insn_postbytes_6809[] = {
 };
 #undef POSTBYTES
 
-const char *opcodes_6809[256] = {
+static const char *opcodes_6809[256] = {
   "NEG",  "?",    "?",    "COM",  "LSR",  "?",    "ROR",  "ASR",
   "ASL",  "ROL",  "DEC",  "?",    "INC",  "TST",  "JMP",  "CLR",
   "(pg2)","(pg3)","NOP",  "SYNC", "?",    "?",    "LBRA", "LBSR",
@@ -103,7 +103,7 @@ static const char *opcodes_long_cond_branches_6809[] = {
   "LBVC", "LBVS", "LBPL", "LBMI", "LBGE", "LBLT", "LBGT", "LBLE"
 };
 
-addrmode_t
+static addrmode_t
 insn_decode_addrmode_indexed_6809(uint8_t pb)
 {
   // Refer to "TABLE 2 - INDEXED ADDRESSING MODE" in the 6809 data sheet.
@@ -178,7 +178,7 @@ insn_decode_addrmode_indexed_6809(uint8_t pb)
   return am;
 }
 
-addrmode_t
+static addrmode_t
 insn_decode_addrmode_6809(struct insn_decode *id)
 {
   // Refer to "TABLE 9 - HEXADECIMAL VALUES OF MACHINE CODES" in the 6809 data sheet.
@@ -322,7 +322,7 @@ insn_decode_addrmode_6809(struct insn_decode *id)
   return am_invalid;
 }
 
-const char *
+static const char *
 insn_decode_format_exg_tfr_regname_6809(uint8_t v)
 {
   switch (v) {
@@ -340,7 +340,7 @@ insn_decode_format_exg_tfr_regname_6809(uint8_t v)
   }
 }
 
-void
+static void
 insn_decode_format_6809(struct insn_decode *id)
 {
   const char *opc, *cp1, *cp2;

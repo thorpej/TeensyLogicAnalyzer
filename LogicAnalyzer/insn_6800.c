@@ -28,7 +28,7 @@
 //
 // 6800 instruction decoding
 //
-const char *opcodes_6800[256] = {
+static const char *opcodes_6800[256] = {
   "?",    "NOP",  "?",    "?",    "?",    "?",    "TAP",  "TPA",
   "INX",  "DEX",  "CLV",  "SEV",  "CLC",  "SEC",  "CLI",  "SEI",
   "SBA",  "CBA",  "?",    "?",    "?",    "?",    "TAB",  "TBA",
@@ -63,7 +63,7 @@ const char *opcodes_6800[256] = {
   "EORB", "ADCB", "ORAB", "ADDB", "?",    "?",    "LDX",  "STX"
 };
 
-addrmode_t
+static addrmode_t
 insn_decode_addrmode_6800(struct insn_decode *id)
 {
   // Refer to "TABLE 1 - HEXADECIMAL VALUES OF MACHINE CODES" in the 6800 data sheet.
@@ -119,7 +119,7 @@ insn_decode_addrmode_6800(struct insn_decode *id)
   return am_invalid;
 }
 
-void
+static void
 insn_decode_format_6800(struct insn_decode *id)
 {
   const char *opc = opcodes_6800[id->bytes[0]];
