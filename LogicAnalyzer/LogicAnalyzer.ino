@@ -526,26 +526,13 @@ const char *
 cpu_name(void)
 {
   switch (cpu) {
-    case cpu_6502:
-      return "6502";
-      break;
-    case cpu_65c02:
-      return "65C02";
-      break;
-    case cpu_6800:
-      return "6800";
-      break;
-    case cpu_6809:
-      return "6809";
-      break;
-    case cpu_6809e:
-      return "6809E";
-      break;
-    case cpu_z80:
-      return "Z80";
-      break;
-    default:
-      return "not set";
+    case cpu_6502:    return "6502";
+    case cpu_65c02:   return "65C02";
+    case cpu_6800:    return "6800";
+    case cpu_6809:    return "6809";
+    case cpu_6809e:   return "6809E";
+    case cpu_z80:     return "Z80";
+    default:          return "not set";
   }
 }
 
@@ -565,92 +552,71 @@ set_cpu(cpu_t ncpu)
   cpu = ncpu;
 }
 
+const char *
+trigger_signal_name(trigger_t t)
+{
+  switch (t) {
+    case tr_reset:    return "/RESET";
+    case tr_irq:      return cpu == cpu_z80 ? "/INT" : "/IRQ";
+    case tr_firq:     return "/FIRQ";
+    case tr_nmi:      return "/NMI";
+    default:          return "<unknown>";
+  }
+}
+
+const char *
+trigger_cycle_name(cycle_t c)
+{
+  switch (c) {
+    case tr_read:       return "read";
+    case tr_write:      return "write";
+    case tr_either:     return "read or write";
+    default:            return "<unknown>";
+  }
+}
+
 void
 show_trigger(void)
 {
-  Serial.print("Trigger: ");
+  char msg[80], *cp = msg;
+
+  cp += sprintf(cp, "Trigger: ");
   switch (triggerMode) {
     case tr_address:
-      if (triggerSpace == tr_io) {
-        Serial.print("on io ");
-      } else {
-        Serial.print("on address ");
-      }
-      Serial.print(triggerAddress, HEX);
-      switch (triggerCycle) {
-        case tr_read:
-          Serial.println(" read");
-          break;
-        case tr_write:
-          Serial.println(" write");
-          break;
-        case tr_either:
-          Serial.println(" read or write");
-          break;
-      }
-      break;
     case tr_data:
-      Serial.print("on data ");
-      Serial.print(triggerData, HEX);
-      switch (triggerCycle) {
-        case tr_read:
-          Serial.println(" read");
-          break;
-        case tr_write:
-          Serial.println(" write");
-          break;
-        case tr_either:
-          Serial.println(" read or write");
-          break;
-      }
-      break;
     case tr_addr_data:
-      if (triggerSpace == tr_io) {
-        Serial.print("on io ");
+      cp = msg;
+      cp += sprintf(cp, "on%s %s ",
+          triggerSpace == tr_io ? " io" : "",
+          triggerMode == tr_data ? "data" : "address");
+      if (triggerMode != tr_data) {
+        if (triggerSpace == tr_io) {
+          cp += sprintf(cp, "%02lX ", triggerAddress);
+        } else {
+          cp += sprintf(cp, "%04lX ", triggerAddress);
+        }
       } else {
-        Serial.print("on address ");
+        cp += sprintf(cp, "%02lX ", triggerData);
       }
-      Serial.print(triggerAddress, HEX);
-      Serial.print(" and data ");
-      Serial.print(triggerData, HEX);
-      switch (triggerCycle) {
-        case tr_read:
-          Serial.println(" read");
-          break;
-        case tr_write:
-          Serial.println(" write");
-          break;
-        case tr_either:
-          Serial.println(" read or write");
-          break;
+      if (triggerMode == tr_addr_data) {
+        cp += sprintf(cp, "and data %02lX ", triggerData);
       }
+      cp += sprintf(cp, "%s", trigger_cycle_name(triggerCycle));
       break;
+
     case tr_reset:
-      Serial.print("on /RESET ");
-      Serial.println(triggerLevel ? "high" : "low");
-      break;
     case tr_irq:
-      if (cpu == cpu_z80) {
-        Serial.print("on /INT ");
-      } else {
-        Serial.print("on /IRQ ");
-      }
-      Serial.println(triggerLevel ? "high" : "low");
-      break;
     case tr_firq:
-      if (cpu == cpu_6809 || cpu == cpu_6809e) {
-        Serial.print("on /FIRQ ");
-        Serial.println(triggerLevel ? "high" : "low");
-      }
-      break;
     case tr_nmi:
-      Serial.print("on /NMI ");
-      Serial.println(triggerLevel ? "high" : "low");
+      cp += sprintf(cp, "on %s %s", trigger_signal_name(triggerMode),
+          triggerLevel ? "high" : "low");
       break;
+
     case tr_none:
-      Serial.println("none (freerun)");
+      cp += sprintf(cp, "none (freerun)");
       break;
   }
+  tla_printf("%s\n", msg);
 }
 
 void
@@ -1567,30 +1533,19 @@ const struct {
   uint32_t    notcpus;
 } triggertab[] = {
   { "address",  tr_address },
-  { "addr",     tr_address },
-  { "a",        tr_address },
-
   { "data",     tr_data },
-  { "d",        tr_data },
-
   { "reset",    tr_reset },
-
   { "irq",      tr_irq,
                 0,
                 (1U << cpu_z80) },
-
   { "int",      tr_irq,
                 (1U << cpu_z80),
                 0 },
-
   { "firq",     tr_firq,
                 (1U << cpu_6809) | (1U << cpu_6809e),
                 0 },
-
   { "nmi",      tr_nmi },
-
   { "none",     tr_none },
-
   { NULL },
 };
 
@@ -1637,19 +1592,24 @@ command_trigger(void)
     return;
   }
 
-  int i, argidx = 1;
+  int i, argidx = 1, modeidx;
   uint32_t cpumask;
   bool iomodifier = false;
 
   cpumask = (cpu == cpu_none) ? 0 : (1U << cpu);
 
   // First, the trigger type.
-  for (i = 0; triggertab[i].typestr != NULL; i++) {
+ mode_again:
+  for (modeidx = -1, i = 0; triggertab[i].typestr != NULL; i++) {
     // Special case for CPUs with I/O space -- check for "io" modifier.
-    if (cpu_has_iospace(cpu) && strcasecmp(argv[argidx], "io") == 0) {
+    if (cpu_has_iospace(cpu) && strcmp(argv[argidx], "io") == 0) {
+      if (iomodifier) {
+        help_trigger();
+        return;
+      }
       iomodifier = true;
       argidx++;
-      continue;
+      goto mode_again;
     }
     if (triggertab[i].forcpus != 0 || triggertab[i].notcpus != 0) {
       // If there's a CPU filter, we need to have the CPU type set.
@@ -1665,17 +1625,32 @@ command_trigger(void)
         continue;
       }
     }
-    if (strcasecmp(triggertab[i].typestr, argv[argidx]) == 0) {
-      break;
+    if (stringMatch(triggertab[i].typestr, argv[argidx]) > 0) {
+      if (modeidx != -1) {
+        tla_printf("Ambiguous trigger mode.");
+        help_trigger();
+        return;
+      }
+      modeidx = i;
     }
   }
-  if (triggertab[i].typestr == NULL) {
-    tla_printf("Invalid trigger mode.\n");
-    help_trigger();
-    return;
+
+  trigger_t new_triggerMode;
+  if (modeidx == -1) {
+    // If we got the iomodifier, allow it as an alias for "address".
+    if (iomodifier) {
+      new_triggerMode = tr_address;
+      // Walk back the argument cursor to point at "io".
+      argidx--;
+    } else {
+      tla_printf("Invalid trigger mode.\n");
+      help_trigger();
+      return;
+    }
+  } else {
+    new_triggerMode = triggertab[modeidx].type;
   }
 
-  trigger_t new_triggerMode = triggertab[i].type;
   cycle_t new_triggerCycle = triggerCycle;
   space_t new_triggerSpace = triggerSpace;
   bool new_triggerLevel = triggerLevel;
@@ -1737,9 +1712,8 @@ command_trigger(void)
       argidx--;
 
       while (argidx != argc) {
-        if (!got_address && (strcmp(argv[argidx], "address") == 0 ||
-                             strcmp(argv[argidx], "addr") == 0 ||
-                             strcmp(argv[argidx], "a") == 0)) {
+        if (!got_address && (stringMatch("address", argv[argidx]) > 0 ||
+            (iomodifier && strcmp("io", argv[argidx]) == 0))) {
           got_address = true;
           argidx++;
           if (argidx == argc) {
@@ -1752,8 +1726,7 @@ command_trigger(void)
           }
           continue;
         }
-        if (!got_data && (strcmp(argv[argidx], "data") == 0 ||
-                          strcmp(argv[argidx], "d") == 0)) {
+        if (!got_data && stringMatch("data", argv[argidx]) > 0) {
           got_data = true;
           argidx++;
           if (argidx == argc) {
@@ -1772,14 +1745,12 @@ command_trigger(void)
           continue;
         }
         if (!got_cycle) {
-          if (strcmp(argv[argidx], "r") == 0 ||
-              strcmp(argv[argidx], "read") == 0) {
+          if (stringMatch("read", argv[argidx]) > 0) {
             got_cycle = true;
             new_triggerCycle = tr_read;
             argidx++;
             continue;
-          } else if (strcmp(argv[argidx], "w") == 0 ||
-                     strcmp(argv[argidx], "write") == 0) {
+          } else if (stringMatch("write", argv[argidx]) > 0) {
             got_cycle = true;
             new_triggerCycle = tr_write;
             argidx++;
@@ -1806,12 +1777,10 @@ command_trigger(void)
         return;
       }
       if (strcmp(argv[argidx], "1") == 0 ||
-          strcasecmp(argv[argidx], "hi") == 0 ||
-          strcasecmp(argv[argidx], "high") == 0) {
+          stringMatch("hi", argv[argidx]) > 0) {
         new_triggerLevel = true;
       } else if (strcmp(argv[argidx], "0") == 0 ||
-                 strcasecmp(argv[argidx], "lo") == 0 ||
-                 strcasecmp(argv[argidx], "low") == 0) {
+                 stringMatch("low", argv[argidx]) > 0) {
         new_triggerLevel = false;
       } else {
         tla_printf("Invalid level indicator.\n");
