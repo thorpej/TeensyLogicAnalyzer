@@ -34,7 +34,7 @@
 // able to go up to at least 30,000 before running out of memory.
 #define BUFFSIZE 5000
 
-const char *versionString = "Teensy Logic Analyzer version 0.2";
+const char *versionString = "Teensy Logic Analyzer version 0.3";
 const char *verboseVersionStringAdditions = " by Jason R. Thorpe <thorpej@me.com>";
 const char *origVersionString = "Based on Logic Analyzer version 0.30 by Jeff Tranter <tranter@pobox.com>";
 
@@ -71,15 +71,15 @@ extern "C" {
   int
   tla_printf(const char *fmt, ...)
   {
+    static char tla_printf_buf[256];
     va_list ap;
-    char msg[100];
     int rv;
 
     va_start(ap, fmt);
-    rv = vsnprintf(msg, sizeof(msg), fmt, ap);
+    rv = vsnprintf(tla_printf_buf, sizeof(tla_printf_buf), fmt, ap);
     va_end(ap);
 
-    Serial.println(msg);
+    Serial.print(tla_printf_buf);
 
     return rv;
   }
@@ -89,10 +89,10 @@ void
 show_version(bool verbose)
 {
   if (verbose) {
-    tla_printf("%s%s", versionString, verboseVersionStringAdditions);
-    tla_printf("%s", origVersionString);
+    tla_printf("%s%s\n", versionString, verboseVersionStringAdditions);
+    tla_printf("%s\n", origVersionString);
   } else {
-    tla_printf(versionString);
+    tla_printf("%s\n", versionString);
   }
 }
 
@@ -512,7 +512,7 @@ setup(void)
 
   Serial.setTimeout(60000);
   show_version(false);
-  tla_printf("Type h or ? for help.");
+  tla_printf("Type \"h\" or \"?\" for help.\n");
 }
 
 // Interrupt handler for trigger button.
@@ -552,7 +552,7 @@ cpu_name(void)
 void
 show_cpu(void)
 {
-  tla_printf("CPU: %s", cpu_name());
+  tla_printf("CPU: %s\n", cpu_name());
 }
 
 void
@@ -656,13 +656,13 @@ show_trigger(void)
 void
 show_samples(void)
 {
-  tla_printf("Sample buffer size: %d", samples);
+  tla_printf("Sample buffer size: %d\n", samples);
 }
 
 void
 show_pretrigger(void)
 {
-  tla_printf("Pretrigger samples: %d", pretrigger);
+  tla_printf("Pretrigger samples: %d\n", pretrigger);
 }
 
 void
@@ -682,7 +682,7 @@ disassemble_one(uint32_t where)
     }
   }
   if (address[i] != where) {
-    tla_printf("Address not found in sample data.");
+    tla_printf("Address not found in sample data.\n");
     return;
   }
 
@@ -694,14 +694,14 @@ disassemble_one(uint32_t where)
 
       case ds_fetching:
         if (address[i] != where + id.bytes_fetched) {
-          tla_printf("!!!! Non-contiguous instruction fetch?");
+          tla_printf("!!!! Non-contiguous instruction fetch?\n");
         }
         // FALLTHROUGH
 
       default:
         insn_decode_continue(&id, data[i]);
       printit:
-        tla_printf("%04lX  %02lX  %s",
+        tla_printf("%04lX  %02lX  %s\n",
             address[i], data[i], insn_decode_complete(&id));
         break;
     }
@@ -1121,12 +1121,12 @@ writeSD(void)
   const char *TXT_FILE = "analyzer.txt";
 
   if (cpu == cpu_none || samplesTaken == 0) {
-    tla_printf("No samples to save.");
+    tla_printf("No samples to save.\n");
     return;
   }
 
   if (!SD.begin(BUILTIN_SDCARD)) {
-    tla_printf("Unable to initialize internal SD card.");
+    tla_printf("Unable to initialize internal SD card.\n");
     return;
   }
 
@@ -1137,11 +1137,11 @@ writeSD(void)
 
   File file = SD.open(CSV_FILE, FILE_WRITE);
   if (file) {
-    tla_printf("Writing %s", CSV_FILE);
+    tla_printf("Writing %s\n", CSV_FILE);
     exportCSV(file, samplesTaken);
     file.close();
   } else {
-    tla_printf("Unable to write %s", CSV_FILE);
+    tla_printf("Unable to write %s\n", CSV_FILE);
   }
 
   // Remove any existing file
@@ -1151,11 +1151,11 @@ writeSD(void)
 
   file = SD.open(TXT_FILE, FILE_WRITE);
   if (file) {
-    tla_printf("Writing %s", TXT_FILE);
+    tla_printf("Writing %s\n", TXT_FILE);
     list(file, 0, samples - 1, samplesTaken);
     file.close();
   } else {
-    tla_printf("Unable to write %s", TXT_FILE);
+    tla_printf("Unable to write %s\n", TXT_FILE);
   }
 }
 
@@ -1175,7 +1175,7 @@ go(void)
   uint32_t cd_psr_cc_bits;
 
   if (cpu == cpu_none) {
-    tla_printf("No CPU type selected!");
+    tla_printf("No CPU type selected!\n");
   }
 
   // Scramble the trigger address, control, and data lines to match what we will read on the ports.
@@ -1258,7 +1258,7 @@ go(void)
     }
   }
 
-  tla_printf("Waiting for trigger...");
+  tla_printf("Waiting for trigger...\n");
 
   triggerPressed = false; // Status of trigger button
 
@@ -1342,7 +1342,7 @@ go(void)
 
   setBusEnabled(false);
 
-  tla_printf("Data recorded (%d samples).", samples);
+  tla_printf("Data recorded (%d samples).\n", samples);
   unscramble();
 }
 
@@ -1390,7 +1390,7 @@ parseAddress(char *cp, space_t space, uint32_t *addrp)
   uint32_t val;
 
   if (! parseHexNumber(cp, &val) || val > maxaddr) {
-    tla_printf("Invalid address: must be between 0 and %lX", maxaddr);
+    tla_printf("Invalid address: must be between 0 and %lX\n", maxaddr);
     return false;
   }
   *addrp = val;
@@ -1436,6 +1436,10 @@ command_cpu(void)
   for (i = 0; cputab[i].cpustr != NULL; i++) {
     if (strcasecmp(cputab[i].cpustr, argv[1]) == 0) {
       set_cpu(cputab[i].cputype);
+      if (triggerMode != tr_none) {
+        triggerMode = tr_none;
+        tla_printf("WARNING: trigger mode reset\n");
+      }
       return true;
     }
   }
@@ -1448,10 +1452,10 @@ help_cpu(void)
 {
   int i;
 
-  tla_printf("usage: cpu        - show current CPU type");
-  tla_printf("       cpu <type> - set CPU type");
+  tla_printf("usage: cpu        - show current CPU type\n");
+  tla_printf("       cpu <type> - set CPU type\n");
   for (i = 0; cputab[i].cpustr != NULL; i++) {
-    tla_printf("%s%s%s",
+    tla_printf("%s%s%s\n",
         i == 0 ? "\n" : "",
         i == 0 ? "<type> must be: "
                : "                ",
@@ -1472,11 +1476,15 @@ command_samples(void)
   int c;
   c = (int) strtol(argv[1], NULL, 10);
   if (c < 1 || c > BUFFSIZE) {
-    tla_printf("Invalid samples, must be between 1 and %d.", BUFFSIZE);
-    return false;
+    tla_printf("Invalid sample count, must be between 1 and %d.\n", BUFFSIZE);
+    return true;
   }
 
   samples = c;
+  if (pretrigger > c) {
+    pretrigger = 0;
+    tla_printf("WARNING: pretrigger sample count reset to 0.\n");
+  }
   memset(control, 0, sizeof(control)); // Clear existing data
   memset(address, 0, sizeof(address));
   memset(data, 0, sizeof(data));
@@ -1486,9 +1494,9 @@ command_samples(void)
 void
 help_samples(void)
 {
-  tla_printf("usage: samples         - show current sample count");
-  tla_printf("       samples <count> - set sample count");
-  tla_printf("\n<count> must be between 1 and %d.", BUFFSIZE);
+  tla_printf("usage: samples         - show current sample count\n");
+  tla_printf("       samples <count> - set sample count\n");
+  tla_printf("\n<count> must be between 1 and %d.\n", BUFFSIZE);
 }
 
 bool
@@ -1504,7 +1512,7 @@ command_pretrigger(void)
   int c;
   c = (int) strtol(argv[1], NULL, 10);
   if (c < 0 || c > samples) {
-    tla_printf("Invalid samples, must be between 0 and %d.", samples);
+    tla_printf("Invalid pretrigger samples count, must be between 0 and %d.\n", samples);
     return false;
   }
 
@@ -1515,10 +1523,10 @@ command_pretrigger(void)
 void
 help_pretrigger(void)
 {
-  tla_printf("usage: pretrigger         - show current pretrigger sample count");
-  tla_printf("       pretrigger <count> - set pretrigger sample count");
-  tla_printf("\n<count> must be between 0 and the numnber of samples.");
-  tla_printf("\nType \"help samples\" for more information.");
+  tla_printf("usage: pretrigger         - show current pretrigger sample count\n");
+  tla_printf("       pretrigger <count> - set pretrigger sample count\n");
+  tla_printf("\n<count> must be between 0 and the numnber of samples.\n");
+  tla_printf("\nType \"help samples\" for more information.\n");
 }
 
 const struct {
@@ -1681,7 +1689,7 @@ command_trigger(void)
             return false;
           }
           if (new_triggerData > 0xff) {
-            tla_printf("Invalid data value: must be between 0 and FF");
+            tla_printf("Invalid data value: must be between 0 and FF\n");
             return true;
           }
           continue;
@@ -1723,7 +1731,7 @@ command_trigger(void)
         new_triggerLevel = true;
       } else if (strcmp(argv[argidx], "0") == 0 ||
                  strcasecmp(argv[argidx], "lo") == 0 ||
-                 strcasecmp(argv[argidx], "low")) {
+                 strcasecmp(argv[argidx], "low") == 0) {
         new_triggerLevel = false;
       } else {
         return false;
@@ -1732,7 +1740,7 @@ command_trigger(void)
 
     case tr_addr_data:
     default:
-      tla_printf("*** INTERNAL ERROR: unxpected trigger mode %d ***", (int)new_triggerMode);
+      tla_printf("*** INTERNAL ERROR: unxpected trigger mode %d ***\n", (int)new_triggerMode);
       return true;
   }
 
@@ -1750,36 +1758,36 @@ command_trigger(void)
 void
 help_trigger(void)
 {
-  tla_printf("usage: trigger %s                                  - show current trigger",
+  tla_printf("usage: trigger %s                                  - show current trigger\n",
       cpu_has_iospace(cpu) ? "     " : "");
-  tla_printf("       trigger %saddress <addr> [r|w]              - trigger on address",
+  tla_printf("       trigger %saddress <addr> [r|w]              - trigger on address\n",
       cpu_has_iospace(cpu) ? "[io] " : "");
-  tla_printf("       trigger %sdata <value> [r|w]                - trigger on data",
+  tla_printf("       trigger %sdata <value> [r|w]                - trigger on data\n",
       cpu_has_iospace(cpu) ? "[io] " : "");
-  tla_printf("       trigger %saddress <addr> data <value> [r|w] - trigger on address and data",
+  tla_printf("       trigger %saddress <addr> data <value> [r|w] - trigger on address and data\n",
       cpu_has_iospace(cpu) ? "[io] " : "");
-  tla_printf("\n       trigger reset 0|1%s                         - trigger on /RESET level",
+  tla_printf("\n       trigger reset 0|1%s                         - trigger on /RESET level\n",
       cpu_has_iospace(cpu) ? "     " : "");
   if (cpu == cpu_z80) {
-    tla_printf("       trigger int 0|1%s                           - trigger on /INT level",
+    tla_printf("       trigger int 0|1%s                           - trigger on /INT level\n",
         cpu_has_iospace(cpu) ? "     " : "");
-  } else {
-    tla_printf("       trigger irq 0|1%s                           - trigger on /IRQ level",
+  } else if (cpu != cpu_none) {
+    tla_printf("       trigger irq 0|1%s                           - trigger on /IRQ level\n",
         cpu_has_iospace(cpu) ? "     " : "");
   }
   if (cpu == cpu_6809 || cpu == cpu_6809e) {
-    tla_printf("       trigger firq 0|1%s                          - trigger on /FIRQ level",
+    tla_printf("       trigger firq 0|1%s                          - trigger on /FIRQ level\n",
         cpu_has_iospace(cpu) ? "     " : "");
   }
-  tla_printf("       trigger nmi 0|1%s                           - trigger on /NMI level",
+  tla_printf("       trigger nmi 0|1%s                           - trigger on /NMI level\n",
       cpu_has_iospace(cpu) ? "     " : "");
 
   if (cpu_has_iospace(cpu)) {
-    tla_printf("\n<addr> must be between 0 and FF for I/O space and 0 and FFFF for memory space.");
+    tla_printf("\n<addr> must be between 0 and FF for I/O space and 0 and FFFF for memory space.\n");
   } else {
-    tla_printf("\n<addr> must be between 0 and FFFF.");
+    tla_printf("\n<addr> must be between 0 and FFFF.\n");
   }
-  tla_printf("<data> must be between 0 and FF.");
+  tla_printf("<data> must be between 0 and FF.\n");
 }
 
 bool
@@ -1795,7 +1803,7 @@ command_go(void)
 void
 help_go(void)
 {
-  tla_printf("usage: go - start the analyzer");
+  tla_printf("usage: go - start the analyzer\n");
 }
 
 bool
@@ -1831,10 +1839,10 @@ command_list(void)
 void
 help_list(void)
 {
-  tla_printf("usage: list [<start> [<end>]] - list samples");
-  tla_printf("\n<start> must be between 0 and the number of samples - 1.");
-  tla_printf("<end> must be between <start> and the number of samples - 1");
-  tla_printf("\nType \"help samples\" for more information.");
+  tla_printf("usage: list [<start> [<end>]] - list samples\n");
+  tla_printf("\n<start> must be between 0 and the number of samples - 1.\n");
+  tla_printf("<end> must be between <start> and the number of samples - 1.\n");
+  tla_printf("\nType \"help samples\" for more information.\n");
 }
 
 bool
@@ -1850,7 +1858,7 @@ command_export(void)
 void
 help_export(void)
 {
-  tla_printf("usage: export - export samples in CSV format");
+  tla_printf("usage: export - export samples in CSV format\n");
 }
 
 bool
@@ -1866,9 +1874,9 @@ command_write(void)
 void
 help_write(void)
 {
-  tla_printf("usage: write - write data to SD card");
-  tla_printf("\nThe file \"analyzer.csv\" will contain the sample data in CSV format.");
-  tla_printf("The file \"analyzer.txt\" will contain the sample data in \"list\" format.");
+  tla_printf("usage: write - write data to SD card\n");
+  tla_printf("\nThe file \"analyzer.csv\" will contain the sample data in CSV format.\n");
+  tla_printf("The file \"analyzer.txt\" will contain the sample data in \"list\" format.\n");
 }
 
 bool
@@ -1887,8 +1895,8 @@ command_decode(void)
 void
 help_decode(void)
 {
-  tla_printf("usage: decode <addr> - decode a single instruction at <addr>");
-  tla_printf("\n<addr> must be between 0 and FFFF and must be present in the sample data.");
+  tla_printf("usage: decode <addr> - decode a single instruction at <addr>\n");
+  tla_printf("\n<addr> must be between 0 and FFFF and must be present in the sample data.\n");
 }
 
 #ifdef DEBUG_SAMPLES
@@ -1993,16 +2001,16 @@ command_help(void)
   show_samples();
   show_pretrigger();
 
-  tla_printf("Commands:");
+  tla_printf("Commands:\n");
   for (i = 0; cmdtab[i].cmdstr != NULL; i++) {
     // Only display command words that have a summary; all of
     // the others are aliases.
     if (cmdtab[i].summary == NULL) {
       continue;
     }
-    tla_printf("%-16s %s", cmdtab[i].cmdstr, cmdtab[i].summary);
+    tla_printf("%-16s - %s\n", cmdtab[i].cmdstr, cmdtab[i].summary);
   }
-  tla_printf("\nType\"help <command>\" for additional information.");
+  tla_printf("\nType \"help <command>\" for additional information.\n");
   return true;
 }
 
@@ -2046,7 +2054,7 @@ tokenizeCommand(void)
 void
 invalidCommand(void)
 {
-  tla_printf("Invalid command: '%s'", saved_cmdbuf);
+  tla_printf("Invalid command: '%s'\n", saved_cmdbuf);
 }
 
 void
