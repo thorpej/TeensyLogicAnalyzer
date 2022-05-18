@@ -38,7 +38,7 @@
 typedef enum { tr_address, tr_data, tr_addr_data, tr_reset, tr_irq, tr_firq, tr_nmi, tr_none } trigger_t;
 typedef enum { tr_mem, tr_io } space_t;
 typedef enum { tr_read, tr_write, tr_either } cycle_t;
-typedef enum { cpu_none, cpu_6502, cpu_65c02, cpu_6800, cpu_6809, cpu_6809e, cpu_z80 } cpu_t;
+typedef enum { cpu_none = -1, cpu_6502 = 0, cpu_65c02 = 1, cpu_6800 = 2, cpu_6809 = 3, cpu_6809e = 4, cpu_z80 = 5 } cpu_t;
 
 #if defined(__cplusplus)
 extern "C" {
