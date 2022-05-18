@@ -1390,11 +1390,39 @@ parseAddress(char *cp, space_t space, uint32_t *addrp)
   uint32_t val;
 
   if (! parseHexNumber(cp, &val) || val > maxaddr) {
-    tla_printf("Invalid address: must be between 0 and %lX\n", maxaddr);
+    tla_printf("Invalid address.\n");
     return false;
   }
   *addrp = val;
   return true;
+}
+
+int
+stringMatch(const char *match, const char *user)
+{
+  int rv = 0;
+  size_t matchlen = strlen(match);
+  size_t userlen = strlen(user);
+
+  if (matchlen == userlen) {
+    if (strcmp(match, user) == 0) {
+      return (int)matchlen;
+    } else {
+      return 0;
+    }
+  } else if (matchlen < userlen) {
+    return 0;
+  }
+
+  // We now know that the user string is shorter than
+  // the match string.
+
+  for (rv = 0; *user != '\0'; rv++) {
+    if (*user++ != *match++) {
+      return 0;
+    }
+  }
+  return rv;
 }
 
 //
@@ -1422,31 +1450,6 @@ const struct {
   NULL,       cpu_none,
 };
 
-bool
-command_cpu(void)
-{
-  if (argc == 1) {
-    show_cpu();
-    return true;
-  } else if (argc != 2) {
-    return false;
-  }
-
-  int i;
-  for (i = 0; cputab[i].cpustr != NULL; i++) {
-    if (strcasecmp(cputab[i].cpustr, argv[1]) == 0) {
-      set_cpu(cputab[i].cputype);
-      if (triggerMode != tr_none) {
-        triggerMode = tr_none;
-        tla_printf("WARNING: trigger mode reset\n");
-      }
-      return true;
-    }
-  }
-
-  return false;
-}
-
 void
 help_cpu(void)
 {
@@ -1463,32 +1466,29 @@ help_cpu(void)
   }
 }
 
-bool
-command_samples(void)
+void
+command_cpu(void)
 {
   if (argc == 1) {
-    show_samples();
-    return true;
+    show_cpu();
+    return;
   } else if (argc != 2) {
-    return false;
+    help_cpu();
+    return;
   }
 
-  int c;
-  c = (int) strtol(argv[1], NULL, 10);
-  if (c < 1 || c > BUFFSIZE) {
-    tla_printf("Invalid sample count, must be between 1 and %d.\n", BUFFSIZE);
-    return true;
+  int i;
+  for (i = 0; cputab[i].cpustr != NULL; i++) {
+    if (strcasecmp(cputab[i].cpustr, argv[1]) == 0) {
+      set_cpu(cputab[i].cputype);
+      if (triggerMode != tr_none) {
+        triggerMode = tr_none;
+        tla_printf("WARNING: trigger mode reset\n");
+      }
+      return;
+    }
   }
-
-  samples = c;
-  if (pretrigger > c) {
-    pretrigger = 0;
-    tla_printf("WARNING: pretrigger sample count reset to 0.\n");
-  }
-  memset(control, 0, sizeof(control)); // Clear existing data
-  memset(address, 0, sizeof(address));
-  memset(data, 0, sizeof(data));
-  return true;
+  tla_printf("Invalid CPU type: %s\n", argv[1]);
 }
 
 void
@@ -1499,25 +1499,33 @@ help_samples(void)
   tla_printf("\n<count> must be between 1 and %d.\n", BUFFSIZE);
 }
 
-bool
-command_pretrigger(void)
+void
+command_samples(void)
 {
   if (argc == 1) {
-    show_pretrigger();
-    return true;
+    show_samples();
+    return;
   } else if (argc != 2) {
-    return false;
+    help_samples();
+    return;
   }
 
   int c;
   c = (int) strtol(argv[1], NULL, 10);
-  if (c < 0 || c > samples) {
-    tla_printf("Invalid pretrigger samples count, must be between 0 and %d.\n", samples);
-    return false;
+  if (c < 1 || c > BUFFSIZE) {
+    tla_printf("Invalid sample count.\n");
+    help_samples();
+    return;
   }
 
-  pretrigger = c;
-  return true;
+  samples = c;
+  if (pretrigger > c) {
+    pretrigger = 0;
+    tla_printf("WARNING: pretrigger sample count reset to 0.\n");
+  }
+  memset(control, 0, sizeof(control)); // Clear existing data
+  memset(address, 0, sizeof(address));
+  memset(data, 0, sizeof(data));
 }
 
 void
@@ -1525,8 +1533,31 @@ help_pretrigger(void)
 {
   tla_printf("usage: pretrigger         - show current pretrigger sample count\n");
   tla_printf("       pretrigger <count> - set pretrigger sample count\n");
-  tla_printf("\n<count> must be between 0 and the numnber of samples.\n");
+  tla_printf("\n<count> must be between 0 and the numnber of samples (currently %d).\n",
+      samples);
   tla_printf("\nType \"help samples\" for more information.\n");
+}
+
+void
+command_pretrigger(void)
+{
+  if (argc == 1) {
+    show_pretrigger();
+    return;
+  } else if (argc != 2) {
+    help_pretrigger();
+    return;
+  }
+
+  int c;
+  c = (int) strtol(argv[1], NULL, 10);
+  if (c < 0 || c > samples) {
+    tla_printf("Invalid pretrigger samples count.\n");
+    help_pretrigger();
+    return;
+  }
+
+  pretrigger = c;
 }
 
 const struct {
@@ -1563,198 +1594,6 @@ const struct {
   { NULL },
 };
 
-bool
-command_trigger(void)
-{
-  if (argc == 1) {
-    show_trigger();
-    return true;
-  }
-
-  int i, argidx = 1;
-  uint32_t cpumask;
-  bool iomodifier = false;
-
-  cpumask = (cpu == cpu_none) ? 0 : (1U << cpu);
-
-  // First, the trigger type.
-  for (i = 0; triggertab[i].typestr != NULL; i++) {
-    // Special case for CPUs with I/O space -- check for "io" modifier.
-    if (cpu_has_iospace(cpu) && strcasecmp(argv[argidx], "io") == 0) {
-      iomodifier = true;
-      argidx++;
-      continue;
-    }
-    if (triggertab[i].forcpus != 0 || triggertab[i].notcpus != 0) {
-      // If there's a CPU filter, we need to have the CPU type set.
-      if (cpumask == 0) {
-        continue;
-      }
-      if (triggertab[i].notcpus != 0 &&
-          (triggertab[i].notcpus & cpumask) != 0) {
-        continue;
-      }
-      if (triggertab[i].forcpus != 0 &&
-          (triggertab[i].forcpus & cpumask) == 0) {
-        continue;
-      }
-    }
-    if (strcasecmp(triggertab[i].typestr, argv[argidx]) == 0) {
-      break;
-    }
-  }
-  if (triggertab[i].typestr == NULL) {
-    return false;
-  }
-
-  trigger_t new_triggerMode = triggertab[i].type;
-  cycle_t new_triggerCycle = triggerCycle;
-  space_t new_triggerSpace = triggerSpace;
-  bool new_triggerLevel = triggerLevel;
-  uint32_t new_triggerAddress = triggerAddress;
-  uint32_t new_triggerData = triggerData;
-
-  argidx++;
-
-  if (iomodifier && (new_triggerMode != tr_address &&
-                     new_triggerMode != tr_data)) {
-    return false;
-  }
-
-  switch (new_triggerMode) {
-    case tr_none:
-      if (argidx != argc) {
-        return false;
-      }
-      break;
-
-    case tr_address:
-    case tr_data: {
-      //
-      // We accept lines like this:
-      //
-      //  t io addr 0x42 data 0xff
-      //  t data $a5 address $cafe w
-      //  t a FFFFh r
-      //
-      // We arrive with our argument index pointing:
-      //
-      //  t data $a5 address $cafe w
-      //         ^^^
-      //         here.
-      //
-      // Because we have to handle both keywords, we're
-      // going to move our argidx back one and just parse
-      // the whole directive again in a loop.  We redundantly
-      // compare the first keyword, but oh well.  We do
-      // already have the new trigger mode stashed away, and
-      // we detect if we got both qualifiers and set the
-      // mode accordingly.
-      //
-      bool got_address = false;
-      bool got_data = false;
-      bool got_cycle = false;
-
-      new_triggerSpace = iomodifier ? tr_io : tr_mem;
-      new_triggerCycle = tr_either;
-
-      // Must at least have first numeric argument.
-      if (argidx == argc) {
-        return false;
-      }
-      argidx--;
-
-      while (argidx != argc) {
-        if (!got_address && (strcmp(argv[argidx], "address") == 0 ||
-                             strcmp(argv[argidx], "addr") == 0 ||
-                             strcmp(argv[argidx], "a") == 0)) {
-          got_address = true;
-          argidx++;
-          if (argidx == argc) {
-            return false;
-          }
-          if (! parseAddress(argv[argidx++], new_triggerSpace, &new_triggerAddress)) {
-            return true;
-          }
-          continue;
-        }
-        if (!got_data && (strcmp(argv[argidx], "data") == 0 ||
-                          strcmp(argv[argidx], "d") == 0)) {
-          got_data = true;
-          argidx++;
-          if (argidx == argc) {
-            return false;
-          }
-          if (! parseHexNumber(argv[argidx++], &new_triggerData)) {
-            return false;
-          }
-          if (new_triggerData > 0xff) {
-            tla_printf("Invalid data value: must be between 0 and FF\n");
-            return true;
-          }
-          continue;
-        }
-        if (!got_cycle) {
-          if (strcmp(argv[argidx], "r") == 0 ||
-              strcmp(argv[argidx], "read") == 0) {
-            got_cycle = true;
-            new_triggerCycle = tr_read;
-            argidx++;
-            continue;
-          } else if (strcmp(argv[argidx], "w") == 0 ||
-                     strcmp(argv[argidx], "write") == 0) {
-            got_cycle = true;
-            new_triggerCycle = tr_write;
-            argidx++;
-            continue;
-          }
-        }
-        return false;
-      }
-      if (got_data && got_address) {
-        new_triggerMode = tr_addr_data;
-      }
-      break;
-    }
-
-    case tr_reset:
-    case tr_irq:
-    case tr_firq:
-    case tr_nmi:
-      // All the rest need a level indicator, and only a level indicator.
-      if (argidx + 1 != argc) {
-        return false;
-      }
-      if (strcmp(argv[argidx], "1") == 0 ||
-          strcasecmp(argv[argidx], "hi") == 0 ||
-          strcasecmp(argv[argidx], "high") == 0) {
-        new_triggerLevel = true;
-      } else if (strcmp(argv[argidx], "0") == 0 ||
-                 strcasecmp(argv[argidx], "lo") == 0 ||
-                 strcasecmp(argv[argidx], "low") == 0) {
-        new_triggerLevel = false;
-      } else {
-        return false;
-      }
-      break;
-
-    case tr_addr_data:
-    default:
-      tla_printf("*** INTERNAL ERROR: unxpected trigger mode %d ***\n", (int)new_triggerMode);
-      return true;
-  }
-
-  // Everthing thing is good -- commit the changes.
-  triggerMode = new_triggerMode;
-  triggerCycle = new_triggerCycle;
-  triggerSpace = new_triggerSpace;
-  triggerLevel = new_triggerLevel;
-  triggerAddress = new_triggerAddress;
-  triggerData = new_triggerData;
-
-  return true;
-}
-
 void
 help_trigger(void)
 {
@@ -1790,14 +1629,210 @@ help_trigger(void)
   tla_printf("<data> must be between 0 and FF.\n");
 }
 
-bool
-command_go(void)
+void
+command_trigger(void)
 {
-  if (argc != 1) {
-    return false;
+  if (argc == 1) {
+    show_trigger();
+    return;
   }
-  go();
-  return true;
+
+  int i, argidx = 1;
+  uint32_t cpumask;
+  bool iomodifier = false;
+
+  cpumask = (cpu == cpu_none) ? 0 : (1U << cpu);
+
+  // First, the trigger type.
+  for (i = 0; triggertab[i].typestr != NULL; i++) {
+    // Special case for CPUs with I/O space -- check for "io" modifier.
+    if (cpu_has_iospace(cpu) && strcasecmp(argv[argidx], "io") == 0) {
+      iomodifier = true;
+      argidx++;
+      continue;
+    }
+    if (triggertab[i].forcpus != 0 || triggertab[i].notcpus != 0) {
+      // If there's a CPU filter, we need to have the CPU type set.
+      if (cpumask == 0) {
+        continue;
+      }
+      if (triggertab[i].notcpus != 0 &&
+          (triggertab[i].notcpus & cpumask) != 0) {
+        continue;
+      }
+      if (triggertab[i].forcpus != 0 &&
+          (triggertab[i].forcpus & cpumask) == 0) {
+        continue;
+      }
+    }
+    if (strcasecmp(triggertab[i].typestr, argv[argidx]) == 0) {
+      break;
+    }
+  }
+  if (triggertab[i].typestr == NULL) {
+    tla_printf("Invalid trigger mode.\n");
+    help_trigger();
+    return;
+  }
+
+  trigger_t new_triggerMode = triggertab[i].type;
+  cycle_t new_triggerCycle = triggerCycle;
+  space_t new_triggerSpace = triggerSpace;
+  bool new_triggerLevel = triggerLevel;
+  uint32_t new_triggerAddress = triggerAddress;
+  uint32_t new_triggerData = triggerData;
+
+  argidx++;
+
+  if (iomodifier && (new_triggerMode != tr_address &&
+                     new_triggerMode != tr_data)) {
+    tla_printf("Invalid trigger mode for \"io\" modifier.\n");
+    help_trigger();
+    return;
+  }
+
+  switch (new_triggerMode) {
+    case tr_none:
+      if (argidx != argc) {
+        help_trigger();
+        return;
+      }
+      break;
+
+    case tr_address:
+    case tr_data: {
+      //
+      // We accept lines like this:
+      //
+      //  t io addr 0x42 data 0xff
+      //  t data $a5 address $cafe w
+      //  t a FFFFh r
+      //
+      // We arrive with our argument index pointing:
+      //
+      //  t data $a5 address $cafe w
+      //         ^^^
+      //         here.
+      //
+      // Because we have to handle both keywords, we're
+      // going to move our argidx back one and just parse
+      // the whole directive again in a loop.  We redundantly
+      // compare the first keyword, but oh well.  We do
+      // already have the new trigger mode stashed away, and
+      // we detect if we got both qualifiers and set the
+      // mode accordingly.
+      //
+      bool got_address = false;
+      bool got_data = false;
+      bool got_cycle = false;
+
+      new_triggerSpace = iomodifier ? tr_io : tr_mem;
+      new_triggerCycle = tr_either;
+
+      // Must at least have first numeric argument.
+      if (argidx == argc) {
+        help_trigger();
+        return;
+      }
+      argidx--;
+
+      while (argidx != argc) {
+        if (!got_address && (strcmp(argv[argidx], "address") == 0 ||
+                             strcmp(argv[argidx], "addr") == 0 ||
+                             strcmp(argv[argidx], "a") == 0)) {
+          got_address = true;
+          argidx++;
+          if (argidx == argc) {
+            help_trigger();
+            return;
+          }
+          if (! parseAddress(argv[argidx++], new_triggerSpace, &new_triggerAddress)) {
+            help_trigger();
+            return;
+          }
+          continue;
+        }
+        if (!got_data && (strcmp(argv[argidx], "data") == 0 ||
+                          strcmp(argv[argidx], "d") == 0)) {
+          got_data = true;
+          argidx++;
+          if (argidx == argc) {
+            help_trigger();
+            return;
+          }
+          if (! parseHexNumber(argv[argidx++], &new_triggerData)) {
+            help_trigger();
+            return;
+          }
+          if (new_triggerData > 0xff) {
+            tla_printf("Invalid data value.\n");
+            help_trigger();
+            return;
+          }
+          continue;
+        }
+        if (!got_cycle) {
+          if (strcmp(argv[argidx], "r") == 0 ||
+              strcmp(argv[argidx], "read") == 0) {
+            got_cycle = true;
+            new_triggerCycle = tr_read;
+            argidx++;
+            continue;
+          } else if (strcmp(argv[argidx], "w") == 0 ||
+                     strcmp(argv[argidx], "write") == 0) {
+            got_cycle = true;
+            new_triggerCycle = tr_write;
+            argidx++;
+            continue;
+          }
+        }
+        help_trigger();
+        return;
+      }
+      if (got_data && got_address) {
+        new_triggerMode = tr_addr_data;
+      }
+      break;
+    }
+
+    case tr_reset:
+    case tr_irq:
+    case tr_firq:
+    case tr_nmi:
+      // All the rest need a level indicator, and only a level indicator.
+      if (argidx + 1 != argc) {
+        tla_printf("Missing level indicator.\n");
+        help_trigger();
+        return;
+      }
+      if (strcmp(argv[argidx], "1") == 0 ||
+          strcasecmp(argv[argidx], "hi") == 0 ||
+          strcasecmp(argv[argidx], "high") == 0) {
+        new_triggerLevel = true;
+      } else if (strcmp(argv[argidx], "0") == 0 ||
+                 strcasecmp(argv[argidx], "lo") == 0 ||
+                 strcasecmp(argv[argidx], "low") == 0) {
+        new_triggerLevel = false;
+      } else {
+        tla_printf("Invalid level indicator.\n");
+        help_trigger();
+        return;
+      }
+      break;
+
+    case tr_addr_data:
+    default:
+      tla_printf("*** INTERNAL ERROR: unxpected trigger mode %d ***\n", (int)new_triggerMode);
+      return;
+  }
+
+  // Everthing thing is good -- commit the changes.
+  triggerMode = new_triggerMode;
+  triggerCycle = new_triggerCycle;
+  triggerSpace = new_triggerSpace;
+  triggerLevel = new_triggerLevel;
+  triggerAddress = new_triggerAddress;
+  triggerData = new_triggerData;
 }
 
 void
@@ -1806,7 +1841,27 @@ help_go(void)
   tla_printf("usage: go - start the analyzer\n");
 }
 
-bool
+void
+command_go(void)
+{
+  if (argc != 1) {
+    help_go();
+    return;
+  }
+  go();
+}
+
+void
+help_list(void)
+{
+  tla_printf("usage: list [<start> [<end>]] - list samples\n");
+  tla_printf("\n<start> must be between 0 and the number of samples - 1 (curretly %d).\n",
+      samples - 1);
+  tla_printf("<end> must be between <start> and the number of samples - 1.\n");
+  tla_printf("\nType \"help samples\" for more information.\n");
+}
+
+void
 command_list(void)
 {
   int start = 0;
@@ -1815,44 +1870,29 @@ command_list(void)
 
   if (argc > 1) {
     if (!parseDecimalNumber(argv[1], &n)) {
-      return false;
+      tla_printf("Invalid <start>.\n");
+      help_list();
+      return;
     }
     start = n;
   }
   if (argc > 2) {
     if (!parseDecimalNumber(argv[2], &n)) {
-      return false;
+      tla_printf("Invalid <end>.\n");
+      help_list();
+      return;
     }
     end = n;
   }
   if (argc > 3) {
-    return false;
+    help_list();
+    return;
   }
   if (start < 0 || start >= samples || end < start || end >= samples) {
     tla_printf("Invalid samples range: must be between 0 and %d.\n", samples - 1);
-    return true;
+    return;
   }
   list(Serial, start, end, samplesTaken);
-  return true;
-}
-
-void
-help_list(void)
-{
-  tla_printf("usage: list [<start> [<end>]] - list samples\n");
-  tla_printf("\n<start> must be between 0 and the number of samples - 1.\n");
-  tla_printf("<end> must be between <start> and the number of samples - 1.\n");
-  tla_printf("\nType \"help samples\" for more information.\n");
-}
-
-bool
-command_export(void)
-{
-  if (argc != 1) {
-    return false;
-  }
-  exportCSV(Serial, samplesTaken);
-  return true;
 }
 
 void
@@ -1861,14 +1901,14 @@ help_export(void)
   tla_printf("usage: export - export samples in CSV format\n");
 }
 
-bool
-command_write(void)
+void
+command_export(void)
 {
   if (argc != 1) {
-    return false;
+    help_export();
+    return;
   }
-  writeSD();
-  return true;
+  exportCSV(Serial, samplesTaken);
 }
 
 void
@@ -1879,17 +1919,14 @@ help_write(void)
   tla_printf("The file \"analyzer.txt\" will contain the sample data in \"list\" format.\n");
 }
 
-bool
-command_decode(void)
+void
+command_write(void)
 {
-  if (argc != 2) {
-    return false;
+  if (argc != 1) {
+    help_write();
+    return;
   }
-  uint32_t pc;
-  if (parseAddress(argv[1], tr_mem, &pc)) {
-    disassemble_one(pc);
-  }
-  return true;
+  writeSD();
 }
 
 void
@@ -1899,9 +1936,24 @@ help_decode(void)
   tla_printf("\n<addr> must be between 0 and FFFF and must be present in the sample data.\n");
 }
 
+void
+command_decode(void)
+{
+  if (argc != 2) {
+    help_decode();
+    return;
+  }
+  uint32_t pc;
+  if (parseAddress(argv[1], tr_mem, &pc)) {
+    disassemble_one(pc);
+  } else {
+    help_decode();
+  }
+}
+
 #ifdef DEBUG_SAMPLES
-bool
-command_testload(void)
+void
+command_loadtest(void)
 {
   samples = samplesTaken = sizeof(debug_data) / sizeof(debug_data[0]);
   cpu = DEBUG_CPU;
@@ -1915,49 +1967,27 @@ command_testload(void)
 }
 #endif // DEBUG_SAMPLES
 
-bool  command_help(void);           // forward decl for table
+void  command_help(void);           // forward decl for table
 
 const struct tla_command {
   const char *cmdstr;
-  bool (*cmdfunc)(void);
+  void (*cmdfunc)(void);
   void (*helpfunc)(void);
   const char *summary;
 } cmdtab[] = {
   { "cpu",        command_cpu,        help_cpu,         "Set CPU type" },
-  { "c",          command_cpu,        help_cpu },
-
   { "samples",    command_samples,    help_samples,     "Set number of samples" },
-  { "s",          command_samples,    help_samples },
-
   { "pretrigger", command_pretrigger, help_pretrigger,  "Set pre-trigger samples" },
-  { "p",          command_pretrigger, help_pretrigger },
-
   { "trigger",    command_trigger,    help_trigger,     "Set trigger mode" },
-  { "t",          command_trigger,    help_trigger },
-
   { "go",         command_go,         help_go,          "Go - start analyzer" },
-  { "g",          command_go,         help_go },
-
   { "list",       command_list,       help_list,        "List samples" },
-  { "l",          command_list,       help_list },
-
   { "export",     command_export,     help_export,      "Export samples as CSV" },
-  { "e",          command_export,     help_export },
-
   { "write",      command_write,      help_write,       "Write data to SD card" },
-  { "w",          command_write,      help_write },
-
   { "decode",     command_decode,     help_decode,      "Decode instruction" },
-  { "disassemble",command_decode,     help_decode },
-  { "dis",        command_decode,     help_decode },
-  { "d",          command_decode,     help_decode },
-
 #ifdef DEBUG_SAMPLES
-  { "testload",   command_testload,   NULL,             "Load test samples" },
+  { "loadtest",   command_loadtest,   NULL,             "Load test samples" },
 #endif
-
   { "help",       command_help,       NULL,             "Show help" },
-  { "h",          command_help,       NULL },
   { "?",          command_help,       NULL },
 
   { NULL },
@@ -1971,14 +2001,14 @@ lookupCommand(const char *cp, const struct tla_command *from)
   }
 
   for (; from->cmdstr != NULL; from++) {
-    if (strcasecmp(from->cmdstr, cp) == 0) {
+    if (stringMatch(from->cmdstr, cp) > 0) {
       return from;
     }
   }
   return NULL;
 }
 
-bool
+void
 command_help(void)
 {
   int i;
@@ -1991,7 +2021,7 @@ command_help(void)
     const struct tla_command * const cmd = lookupCommand(argv[1], NULL);
     if (cmd != NULL && cmd->helpfunc != NULL) {
       (*cmd->helpfunc)();
-      return true;
+      return;
     }
   }
 
@@ -2003,15 +2033,12 @@ command_help(void)
 
   tla_printf("Commands:\n");
   for (i = 0; cmdtab[i].cmdstr != NULL; i++) {
-    // Only display command words that have a summary; all of
-    // the others are aliases.
     if (cmdtab[i].summary == NULL) {
       continue;
     }
     tla_printf("%-16s - %s\n", cmdtab[i].cmdstr, cmdtab[i].summary);
   }
   tla_printf("\nType \"help <command>\" for additional information.\n");
-  return true;
 }
 
 bool
@@ -2060,9 +2087,8 @@ invalidCommand(void)
 void
 loop(void)
 {
-  const struct tla_command *cmd;
+  const struct tla_command *cmd, *foundcmd;
   unsigned int ci;
-  bool goodcmd;
 
   while (true) {
     Serial.print("% "); // Command prompt
@@ -2104,12 +2130,20 @@ loop(void)
       continue;
     }
 
-    goodcmd = false;
+    foundcmd = NULL;
     if ((cmd = lookupCommand(argv[0], NULL)) != NULL) {
-      goodcmd = (cmd->cmdfunc)();
+      if (foundcmd == NULL) {
+        foundcmd = cmd;
+        cmd = lookupCommand(argv[0], foundcmd + 1);
+        if (cmd != NULL) {
+          tla_printf("Ambiguous command: '%s'\n", saved_cmdbuf);
+          continue;
+        }
+      }
     }
-    if (!goodcmd) {
+    if (foundcmd == NULL) {
       invalidCommand();
     }
+    foundcmd->cmdfunc();
   }
 }
