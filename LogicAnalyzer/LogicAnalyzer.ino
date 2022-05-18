@@ -1777,7 +1777,7 @@ command_trigger(void)
         return;
       }
       if (strcmp(argv[argidx], "1") == 0 ||
-          stringMatch("hi", argv[argidx]) > 0) {
+          stringMatch("high", argv[argidx]) > 0) {
         new_triggerLevel = true;
       } else if (strcmp(argv[argidx], "0") == 0 ||
                  stringMatch("low", argv[argidx]) > 0) {
