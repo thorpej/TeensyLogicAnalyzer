@@ -5,8 +5,8 @@ $Descr A 11000 8500
 encoding utf-8
 Sheet 1 1
 Title "TeensyLogicAnalyzer main board"
-Date "2022-04-30"
-Rev "1.0"
+Date "2022-05-21"
+Rev "1.1"
 Comp "Copyright (c) 2022 Jason R. Thorpe.  See LICENSE."
 Comment1 ""
 Comment2 ""
@@ -619,7 +619,7 @@ U 1 1 626ACC39
 P 3000 4550
 F 0 "SW1" H 3000 4835 50  0000 C CNN
 F 1 "SW_Push" H 3000 4744 50  0000 C CNN
-F 2 "Button_Switch_THT:SW_TH_Tactile_Omron_B3F-10xx" H 3000 4750 50  0001 C CNN
+F 2 "Button_Switch_THT:SW_PUSH_6mm" H 3000 4750 50  0001 C CNN
 F 3 "~" H 3000 4750 50  0001 C CNN
 	1    3000 4550
 	1    0    0    -1  
@@ -838,10 +838,10 @@ $EndComp
 NoConn ~ 1200 2050
 NoConn ~ 11500 500 
 $Comp
-L power:GND #PWR?
+L power:GND #PWR0114
 U 1 1 628983B4
 P 8950 4400
-F 0 "#PWR?" H 8950 4150 50  0001 C CNN
+F 0 "#PWR0114" H 8950 4150 50  0001 C CNN
 F 1 "GND" V 8955 4272 50  0000 R CNN
 F 2 "" H 8950 4400 50  0001 C CNN
 F 3 "" H 8950 4400 50  0001 C CNN
@@ -849,10 +849,10 @@ F 3 "" H 8950 4400 50  0001 C CNN
 	0    -1   -1   0   
 $EndComp
 $Comp
-L power:GND #PWR?
+L power:GND #PWR0115
 U 1 1 62898A39
 P 8450 4400
-F 0 "#PWR?" H 8450 4150 50  0001 C CNN
+F 0 "#PWR0115" H 8450 4150 50  0001 C CNN
 F 1 "GND" V 8455 4272 50  0000 R CNN
 F 2 "" H 8450 4400 50  0001 C CNN
 F 3 "" H 8450 4400 50  0001 C CNN
