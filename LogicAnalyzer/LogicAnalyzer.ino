@@ -34,7 +34,7 @@
 // able to go up to at least 30,000 before running out of memory.
 #define BUFFSIZE 5000
 
-const char *versionString = "Teensy Logic Analyzer version 0.3";
+const char *versionString = "Teensy Logic Analyzer version 0.4";
 const char *verboseVersionStringAdditions = " by Jason R. Thorpe <thorpej@me.com>";
 const char *origVersionString = "Based on Logic Analyzer version 0.30 by Jeff Tranter <tranter@pobox.com>";
 
