@@ -494,6 +494,13 @@ setup(void)
         setBusEnabled(false);
         break;
 
+      case BUTTON_PIN:
+        // The button goes to ground; we need to figure as an
+        // input-pullup.  Interrupt is triggered on the falling
+        // edge.
+        pinMode(BUTTON_PIN, INPUT_PULLUP);
+        break;
+
       default:
         // Every other pin is configured as an input.  *No* pull-up;
         // the 74LVC245 has push-pull outputs.
