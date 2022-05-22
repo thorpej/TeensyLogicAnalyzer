@@ -619,8 +619,12 @@ show_trigger(void)
           triggerLevel ? "high" : "low");
       break;
 
+    case tr_manual:
+      cp += sprintf(cp, "manual (button)");
+      break;
+
     case tr_none:
-      cp += sprintf(cp, "none (freerun)");
+      cp += sprintf(cp, "none (immediate)");
       break;
   }
   tla_printf("%s\n", msg);
@@ -1233,7 +1237,8 @@ go(void)
 
   tla_printf("Waiting for trigger...\n");
 
-  triggerPressed = false; // Status of trigger button
+  // tr_none is like the button is pressed instantly.
+  triggerPressed = triggerMode == tr_none;
 
   setBusEnabled(true);
   digitalWriteFast(CORE_LED0_PIN, HIGH); // Indicates waiting for trigger
@@ -1454,7 +1459,7 @@ command_cpu(void)
   for (i = 0; cputab[i].cpustr != NULL; i++) {
     if (strcasecmp(cputab[i].cpustr, argv[1]) == 0) {
       set_cpu(cputab[i].cputype);
-      if (triggerMode != tr_none) {
+      if (triggerMode != tr_none && triggerMode != tr_manual) {
         triggerMode = tr_none;
         tla_printf("WARNING: trigger mode reset\n");
       }
@@ -1530,6 +1535,12 @@ command_pretrigger(void)
     return;
   }
 
+  if (triggerMode == tr_none) {
+    tla_printf("Cannot have pretrigger samples with trigger mode 'none'.\n");
+    pretrigger = 0;
+    return;
+  }
+
   pretrigger = c;
 }
 
@@ -1552,6 +1563,7 @@ const struct {
                 (1U << cpu_6809) | (1U << cpu_6809e),
                 0 },
   { "nmi",      tr_nmi },
+  { "manual",   tr_manual },
   { "none",     tr_none },
   { NULL },
 };
@@ -1675,6 +1687,12 @@ command_trigger(void)
 
   switch (new_triggerMode) {
     case tr_none:
+      if (pretrigger != 0) {
+        tla_printf("Warning: pretrigger reset to 0.\n");
+        pretrigger = 0;
+      }
+      // FALLTHROUGH
+    case tr_manual:
       if (argidx != argc) {
         help_trigger();
         return;
