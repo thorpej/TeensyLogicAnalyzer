@@ -579,7 +579,7 @@ insn_decode_format_6809(struct insn_decode *id)
     case am6809_pcrel8_ind:
     case am6809_pcrel16:
     case am6809_pcrel16_ind:
-      id->resolved_address = id->insn_address + reloff;
+      id->resolved_address = id->insn_address + id->bytes_required + reloff;
       id->resolved_address_valid = true;
       break;
 
